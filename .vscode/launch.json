@@ -1,0 +1,45 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Task1",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "run.py",
+      "console": "internalConsole",
+      "args": [
+        "--do_eval",
+        "--task",
+        "${input:task}",
+        "--dataset",
+        "${input:dataset}",
+        "--model",
+        "${input:model}"
+      ]
+    }
+  ],
+  "inputs": [
+    {
+      "id": "task",
+      "type": "pickString",
+      "options": ["nli", "qa"],
+      "default": "nli",
+      "description": "Pick a task"
+    },
+    {
+      "id": "dataset",
+      "type": "promptString",
+      "default": "None",
+      "description": "Dataset (leave blank for defaults)"
+    },
+    {
+      "id": "model",
+      "type": "promptString",
+      "default": "None",
+      "description": "Model (leave blank for defaults)"
+    }
+  ]
+}
