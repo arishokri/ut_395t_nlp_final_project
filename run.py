@@ -169,6 +169,10 @@ def main():
         eval_dataset = dataset[eval_split]
         if args.max_eval_samples:
             eval_dataset = eval_dataset.select(range(args.max_eval_samples))
+        if "id" not in eval_dataset.column_names:
+            eval_dataset = eval_dataset.map(
+                lambda ex, idx: {"id": str(idx)}, with_indices=True
+            )
         eval_dataset_featurized = eval_dataset.map(
             prepare_eval_dataset,
             batched=True,

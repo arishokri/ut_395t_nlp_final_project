@@ -53,6 +53,29 @@ This repo uses [Huggingface Datasets](https://huggingface.co/docs/datasets/) to 
 The Dataset objects loaded by this module can be filtered and updated easily using the `Dataset.filter` and `Dataset.map` methods.
 For more information on working with datasets loaded as HF Dataset objects, see [this page](https://huggingface.co/docs/datasets/v2.1.0/en/access).
 
-## Reporting results
+Pass `dataset:subset` to `--dataset` argument when using custom HF datasets.
 
-See results.md for reporting (WIP).
+## Results
+
+**NLI Task**
+
+| setup | dataset           | model         | train time\* | accuracy |
+| ----- | ----------------- | ------------- | ------------ | -------- |
+| Base  | SNLI              | Electra-small | 50m          | 89.23%   |
+| Base  | mNLI<sup>[1]<sup> | Electra-small | 36m          | 81.61%   |
+
+**QA Task**
+
+| setup | dataset            | model         | train time\* | EM     | F1     |
+| ----- | ------------------ | ------------- | ------------ | ------ | ------ |
+| Base  | SQuAD              | Electra-small | 24m          | 78.20% | 86.24% |
+| Base  | HotpotQA           | Electra-small | 24m          | 78.20% | 86.24% |
+| Base  | emrQA<sup>[2]<sup> | Electra-small | 1h:10m       |        |        |
+
+\* train time on RTX3090
+
+[1] GLUE: A Multi-Task Benchmark and Analysis Platform for Natural Language Understanding: [Article](https://arxiv.org/abs/1804.07461); [Dataset](https://huggingface.co/datasets/nyu-mll/glue)
+
+    Use with glue:mnli
+
+[2] emrQA: A Large Corpus for Question Answering on Electronic Medical Records: [Article](https://arxiv.org/abs/1809.00732); [Dataset](https://huggingface.co/datasets/Eladio/emrqa-msquad) needs verification
