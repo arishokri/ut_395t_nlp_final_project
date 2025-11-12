@@ -69,8 +69,8 @@ Pass `dataset:subset` to `--dataset` argument when using custom HF datasets.
 | setup | dataset            | model         | train time\* | EM     | F1     |
 | ----- | ------------------ | ------------- | ------------ | ------ | ------ |
 | Base  | SQuAD              | Electra-small | 24m          | 78.20% | 86.24% |
-| Base  | HotpotQA           | Electra-small | 24m          | 78.20% | 86.24% |
-| Base  | emrQA<sup>[2]<sup> | Electra-small | 1h:10m       |        |        |
+| Base  | HotpotQA           | Electra-small | NA           | NA     | NA     |
+| Base  | emrQA<sup>[2]<sup> | Electra-small | 1h:10m       | NA     | NA     |
 
 \* train time on RTX3090
 
