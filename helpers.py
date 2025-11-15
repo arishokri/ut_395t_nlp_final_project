@@ -291,8 +291,30 @@ class QuestionAnsweringTrainer(Trainer):
                                                     output.predictions)
             formatted_predictions = [{"id": k, "prediction_text": v}
                                      for k, v in eval_preds.items()]
-            references = [{"id": ex["id"], "answers": ex['answers']}
-                          for ex in eval_examples]
+            # references = [{"id": ex["id"], "answers": ex['answers']}
+                        #   for ex in eval_examples]
+
+            # code to handle answer_end, answer_start etc.
+            references = []
+            for ex in eval_examples:
+                ans = ex["answers"]
+
+                # Case 1: dict with lists: {"text": [...], "answer_start": [...], "answer_end": [...]}
+                if isinstance(ans, dict):
+                    cleaned_answers = {
+                        "text": ans.get("text", []),
+                        "answer_start": ans.get("answer_start", []),
+                    }
+                # Case 2: list of dicts: [{"text": ..., "answer_start": ..., ...}, ...]
+                else:
+                    texts = []
+                    starts = []
+                    for a in ans:
+                        texts.append(a.get("text", ""))
+                        starts.append(a.get("answer_start", 0))
+                    cleaned_answers = {"text": texts, "answer_start": starts}
+
+                references.append({"id": ex["id"], "answers": cleaned_answers})
 
             # compute the metrics according to the predictions and references
             metrics = self.compute_metrics(
