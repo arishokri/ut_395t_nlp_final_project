@@ -66,13 +66,14 @@ Pass `dataset:subset` to `--dataset` argument when using custom HF datasets.
 
 **QA Task**
 
-| setup | dataset            | model         | train time\* | EM     | F1     |
-| ----- | ------------------ | ------------- | ------------ | ------ | ------ |
-| Base  | SQuAD              | Electra-small | 24m          | 78.20% | 86.24% |
-| Base  | HotpotQA           | Electra-small | NA           | NA     | NA     |
-| Base  | emrQA<sup>[2]<sup> | Electra-small | 1h:10m       | NA     | NA     |
+| setup | dataset                   | model         | train time\* | train time\** | EM     | F1     |     
+| ----- | ------------------------- | ------------- | ------------ | ------------- | ------ | ------ |
+| Base  | SQuAD                     | Electra-small | 24m          | 17m           | 78.20  | 86.24  |
+| Base  | HotpotQA                  | Electra-small | NA           | NA            | NA     | NA     |
+| Base  | emrQA-msquad<sup>[2]<sup> | Electra-small | 1h:10m       | 50m           | 90.24  | 92.65  |
 
-\* train time on RTX3090
+\* train time on RTX 3090
+\** train time on RTX 5070 Ti
 
 [1] GLUE: A Multi-Task Benchmark and Analysis Platform for Natural Language Understanding: [Article](https://arxiv.org/abs/1804.07461); [Dataset](https://huggingface.co/datasets/nyu-mll/glue)
 
