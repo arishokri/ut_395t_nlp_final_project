@@ -1,22 +1,24 @@
+import json
+import os
+
 import datasets
+import evaluate
 from transformers import (
-    AutoTokenizer,
-    AutoModelForSequenceClassification,
     AutoModelForQuestionAnswering,
+    AutoModelForSequenceClassification,
+    AutoTokenizer,
+    HfArgumentParser,
     Trainer,
     TrainingArguments,
-    HfArgumentParser,
 )
-import evaluate
+
 from helpers import (
+    QuestionAnsweringTrainer,
+    compute_accuracy,
     prepare_dataset_nli,
     prepare_train_dataset_qa,
     prepare_validation_dataset_qa,
-    QuestionAnsweringTrainer,
-    compute_accuracy,
 )
-import os
-import json
 
 NUM_PREPROCESSING_WORKERS = 2
 
@@ -94,6 +96,7 @@ def main():
         args.dataset.endswith(".json") or args.dataset.endswith(".jsonl")
     ):
         dataset_id = None
+        dataset_name = args.dataset
         # Load from local json/jsonl file
         dataset = datasets.load_dataset("json", data_files=args.dataset)
         # By default, the "json" dataset loader places all examples in the train split,
@@ -106,6 +109,9 @@ def main():
             tuple(args.dataset.split(":"))
             if args.dataset
             else default_datasets[args.task]
+        )
+        dataset_name = (
+            args.dataset if args.dataset else ("squad" if args.task == "qa" else "snli")
         )
         # MNLI has two validation splits (one with matched domains and one with mismatched domains). Most datasets just have one "validation" split
         eval_split = (
@@ -134,8 +140,12 @@ def main():
 
     # Select the dataset preprocessing function (these functions are defined in helpers.py)
     if args.task == "qa":
-        prepare_train_dataset = lambda exs: prepare_train_dataset_qa(exs, tokenizer)
-        prepare_eval_dataset = lambda exs: prepare_validation_dataset_qa(exs, tokenizer)
+        prepare_train_dataset = lambda exs: prepare_train_dataset_qa(
+            exs, tokenizer, dataset_name
+        )
+        prepare_eval_dataset = lambda exs: prepare_validation_dataset_qa(
+            exs, tokenizer, dataset_name
+        )
     elif args.task == "nli":
         prepare_train_dataset = prepare_eval_dataset = lambda exs: prepare_dataset_nli(
             exs, tokenizer, args.max_length
@@ -150,6 +160,15 @@ def main():
     if dataset_id == ("snli",):
         # remove SNLI examples with no label
         dataset = dataset.filter(lambda ex: ex["label"] != -1)
+
+    # Dataset-specific preprocessing
+    if dataset_name and "emrqa" in dataset_name.lower():
+        # EMR-QA: Add ID column if missing
+        for split in dataset.keys():
+            if "id" not in dataset[split].column_names:
+                dataset[split] = dataset[split].map(
+                    lambda ex, idx: {"id": str(idx)}, with_indices=True
+                )
 
     train_dataset = None
     eval_dataset = None
@@ -169,7 +188,8 @@ def main():
         eval_dataset = dataset[eval_split]
         if args.max_eval_samples:
             eval_dataset = eval_dataset.select(range(args.max_eval_samples))
-        if "id" not in eval_dataset.column_names:
+        # Add ID column if missing (for all QA datasets)
+        if args.task == "qa" and "id" not in eval_dataset.column_names:
             eval_dataset = eval_dataset.map(
                 lambda ex, idx: {"id": str(idx)}, with_indices=True
             )
@@ -183,6 +203,7 @@ def main():
     # Select the training configuration
     trainer_class = Trainer
     eval_kwargs = {}
+    trainer_kwargs = {}
     # If you want to use custom metrics, you should define your own "compute_metrics" function.
     # For an example of a valid compute_metrics function, see compute_accuracy in helpers.py.
     compute_metrics = None
@@ -191,6 +212,7 @@ def main():
         # to enable the question-answering specific evaluation metrics
         trainer_class = QuestionAnsweringTrainer
         eval_kwargs["eval_examples"] = eval_dataset
+        trainer_kwargs["dataset_name"] = dataset_name
         metric = evaluate.load("squad")  # datasets.load_metric() deprecated
         compute_metrics = lambda eval_preds: metric.compute(
             predictions=eval_preds.predictions, references=eval_preds.label_ids
@@ -215,6 +237,7 @@ def main():
         eval_dataset=eval_dataset_featurized,
         processing_class=tokenizer,
         compute_metrics=compute_metrics_and_store_predictions,
+        **trainer_kwargs,
     )
     # Train and/or evaluate
     if training_args.do_train:
