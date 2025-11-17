@@ -71,20 +71,24 @@ Pass `dataset:subset` to `--dataset` argument when using custom HF datasets.
 
 ## Results
 
-**NLI Task**
+### NLI Task
 
-| setup | dataset           | model         | train time\* | accuracy |
-| ----- | ----------------- | ------------- | ------------ | -------- |
-| Base  | SNLI              | Electra-small | 50m          | 89.23%   |
-| Base  | mNLI<sup>[1]<sup> | Electra-small | 36m          | 81.61%   |
+**Base vs. Train on Target Dataset**
 
-**QA Task**
+| dataset           | model         | train time\* | accuracy        |
+| ----------------- | ------------- | ------------ | --------------- |
+| SNLI              | Electra-small | 50m          | 33.57% / 89.23% |
+| mNLI<sup>[1]<sup> | Electra-small | 36m          | 35.30% / 81.61% |
 
-| setup | dataset                   | model         | train time\* | train time\*\* | EM    | F1    |
-| ----- | ------------------------- | ------------- | ------------ | -------------- | ----- | ----- |
-| Base  | SQuAD                     | Electra-small | 24m          | 17m            | 78.20 | 86.24 |
-| Base  | HotpotQA                  | Electra-small | NA           | NA             | NA    | NA    |
-| Base  | emrQA-msquad<sup>[2]<sup> | Electra-small | 1h:10m       | 50m            | 90.24 | 92.65 |
+### QA Task
+
+**Base vs. Train on Target Dataset**
+
+| dataset                   | model         | train time\* | train time\*\* | EM           | F1           |
+| ------------------------- | ------------- | ------------ | -------------- | ------------ | ------------ |
+| SQuAD                     | Electra-small | 24m          | 17m            | 0.08 / 78.20 | 5.94 / 86.24 |
+| HotpotQA<sup>[2]<sup>     | Electra-small | 1h30m        | NA             | 0.0 / 25.04  | 1.84 / 34.64 |
+| emrQA-msquad<sup>[3]<sup> | Electra-small | 1h:10m       | 50m            | 0.02 / 90.24 | 8.04 / 92.65 |
 
 \* train time on RTX 3090
 
@@ -94,7 +98,13 @@ Pass `dataset:subset` to `--dataset` argument when using custom HF datasets.
 
     Use with glue:mnli
 
-[2] emrQA-msquad: A Medical Dataset Structured with the SQuAD V2.0 Framework, Enriched with emrQA Medical Information: [Article](https://arxiv.org/abs/2404.12050); [Dataset](https://huggingface.co/datasets/Eladio/emrqa-msquad)
+[2] HotpotQA: A Dataset for Diverse, Explainable Multi-hop Question Answering: [Article](https://arxiv.org/abs/1809.09600); [Dataset](https://huggingface.co/datasets/hotpotqa/hotpot_qa)
+
+    Use with hotpotqa/hotpot_qa:fullwiki
+
+[3] emrQA-msquad: A Medical Dataset Structured with the SQuAD V2.0 Framework, Enriched with emrQA Medical Information: [Article](https://arxiv.org/abs/2404.12050); [Dataset](https://huggingface.co/datasets/Eladio/emrqa-msquad)
+
+    Use with Eladio/emrqa-msquad
 
 ## To Debug
 
