@@ -200,8 +200,10 @@ def prepare_train_dataset_qa(
         else:
             # Start/end character index of the answer in the text.
             start_char = answers["answer_start"][0]
-            end_char = start_char + len(answers["text"][0])
-
+            if "answer_end" in answers and len(answers["answer_end"]) > 0:
+                end_char = answers["answer_end"][0]
+            else:
+                end_char = start_char + len(answers["text"][0])
             # Start token index of the current span in the text.
             token_start_index = 0
             while sequence_ids[token_start_index] != 1:
