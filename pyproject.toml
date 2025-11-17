@@ -1,5 +1,5 @@
 [project]
-name = "ut-395t-nlp-final-project"
+name = "final-project"
 version = "0.1.0"
 requires-python = ">=3.14"
 dependencies = [
