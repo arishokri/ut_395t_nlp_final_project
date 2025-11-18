@@ -109,3 +109,33 @@ Pass `dataset:subset` to `--dataset` argument when using custom HF datasets.
 ## To Debug
 
 To use VSCode debugpy simply modify and use `launch.json`. It is currently mofied to provide base debugging.
+
+## Financial Data: Pre-training and Evaluation
+
+**Datasets:**
+
+- [Financial News](https://huggingface.co/datasets/Brianferrell787/financial-news-multisource)
+- [fiQA](https://huggingface.co/datasets/LLukas22/fiqa)
+
+**Model:**
+
+- Base: microsoft/mpnet-base; bert-base-uncased
+- Sentence_Transformers: sentence-transformers/all-mpnet-base-v2; sentence-transformers/all-MiniLM-L12-v2
+- Fine-tuned for financial data: [LLukas22/all-mpnet-base-v2-embedding-all](https://huggingface.co/LLukas22/all-mpnet-base-v2-embedding-all)
+
+```bash
+# Example Training
+python embed.py --do_train --model bert-base-uncased \
+    --sentence_transformer False \
+    --train_dataset Brianferrell787/financial-news-multisource \
+    --max_train_rows 1000000 --save_total_limit 10
+
+# Example Evaluation
+python embed.py --do_eval \
+    --model LLukas22/all-mpnet-base-v2-embedding-all \
+    --sentence_transformer True
+```
+
+**Notes:**
+
+- When using base models or your own fine-tuned models you need to execute with `--sentence_transformer False` (default), otherwise use `--sentence_transformer True`
