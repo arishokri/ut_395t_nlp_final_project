@@ -89,7 +89,12 @@ def main():
     "--question_only",
     action="store_true",
     help="If set, mask out context tokens so model sees only the question.",
-)
+    )
+    argp.add_argument(
+    "--passage_only",
+    action="store_true",
+    help="Remove question content so the model sees only the passage.",
+    )
 
 
     training_args, args = argp.parse_args_into_dataclasses()
