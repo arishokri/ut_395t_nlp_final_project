@@ -154,10 +154,15 @@ def compute_accuracy(eval_preds: EvalPrediction):
 # and finding the right offsets for the answer spans in the tokenized context (to use as labels).
 # Adapted from https://github.com/huggingface/transformers/blob/master/examples/pytorch/question-answering/run_qa.py
 def prepare_train_dataset_qa(
-    examples, tokenizer, dataset_name=None, max_seq_length=None, question_only: bool = False
+    examples, tokenizer, dataset_name=None, max_seq_length=None, question_only: bool = False, passage_only: bool = False
 ):
     questions = [q.lstrip() for q in examples["question"]]
     max_seq_length = tokenizer.model_max_length
+
+    # If passage-only, destroy question content
+    if passage_only:
+        # generic question template so model doesn't find value in this
+        questions = ["What is the answer?" for _ in questions]
 
     # Preprocess based on dataset format
     contexts, normalized_answers = preprocess_dataset_for_qa(examples, dataset_name)
@@ -259,13 +264,17 @@ def prepare_train_dataset_qa(
     return tokenized_examples
 
 
-def prepare_validation_dataset_qa(examples, tokenizer, dataset_name=None, question_only: bool = False):
+def prepare_validation_dataset_qa(examples, tokenizer, dataset_name=None, question_only: bool = False, passage_only: bool = False):
     questions = [q.lstrip() for q in examples["question"]]
     max_seq_length = tokenizer.model_max_length
 
+    # same idea as training dataset
+    if passage_only:
+        questions = ["What is the answer?" for _ in questions]
+    
     # Preprocess based on dataset format
     contexts = prepare_dataset_for_evaluation(examples, dataset_name)
-
+    
     tokenized_examples = tokenizer(
         questions,
         contexts,
@@ -297,7 +306,7 @@ def prepare_validation_dataset_qa(examples, tokenizer, dataset_name=None, questi
         tokenized_examples["input_ids"] = input_ids
         tokenized_examples["attention_mask"] = attention_mask
     # <<< end question-only ablation >>>
-    
+
     # Since one example might give us several features if it has a long context, we need a map from a feature to
     # its corresponding example. This key gives us just that.
     sample_mapping = tokenized_examples.pop("overflow_to_sample_mapping")
