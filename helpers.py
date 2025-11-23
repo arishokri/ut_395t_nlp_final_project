@@ -154,7 +154,7 @@ def compute_accuracy(eval_preds: EvalPrediction):
 # and finding the right offsets for the answer spans in the tokenized context (to use as labels).
 # Adapted from https://github.com/huggingface/transformers/blob/master/examples/pytorch/question-answering/run_qa.py
 def prepare_train_dataset_qa(
-    examples, tokenizer, dataset_name=None, max_seq_length=None
+    examples, tokenizer, dataset_name=None, max_seq_length=None, question_only: bool = False
 ):
     questions = [q.lstrip() for q in examples["question"]]
     max_seq_length = tokenizer.model_max_length
@@ -172,6 +172,28 @@ def prepare_train_dataset_qa(
         return_offsets_mapping=True,
         padding="max_length",
     )
+
+    # >>> Question-only ablation: mask out context tokens <<<
+    if question_only and "token_type_ids" in tokenized_examples:
+        pad_id = tokenizer.pad_token_id
+        input_ids = tokenized_examples["input_ids"]
+        attention_mask = tokenized_examples["attention_mask"]
+        token_type_ids = tokenized_examples["token_type_ids"]
+
+        for i in range(len(input_ids)):
+            ids_row = input_ids[i]
+            attn_row = attention_mask[i]
+            seg_row = token_type_ids[i]
+
+            for j in range(len(ids_row)):
+                # In BERT/ELECTRA-style tokenizers: 0 = question, 1 = context
+                if seg_row[j] == 1 and attn_row[j] == 1:
+                    attn_row[j] = 0              # hide from attention
+                    ids_row[j] = pad_id          # optional: visually mark as PAD
+
+        tokenized_examples["input_ids"] = input_ids
+        tokenized_examples["attention_mask"] = attention_mask
+    # <<< end question-only ablation >>>
 
     # Since one example might give us several features if it has a long context,
     # we need a map from a feature to its corresponding example.
@@ -237,7 +259,7 @@ def prepare_train_dataset_qa(
     return tokenized_examples
 
 
-def prepare_validation_dataset_qa(examples, tokenizer, dataset_name=None):
+def prepare_validation_dataset_qa(examples, tokenizer, dataset_name=None, question_only: bool = False):
     questions = [q.lstrip() for q in examples["question"]]
     max_seq_length = tokenizer.model_max_length
 
@@ -255,6 +277,27 @@ def prepare_validation_dataset_qa(examples, tokenizer, dataset_name=None):
         padding="max_length",
     )
 
+    # >>> Question-only ablation: mask out context tokens <<<
+    if question_only and "token_type_ids" in tokenized_examples:
+        pad_id = tokenizer.pad_token_id
+        input_ids = tokenized_examples["input_ids"]
+        attention_mask = tokenized_examples["attention_mask"]
+        token_type_ids = tokenized_examples["token_type_ids"]
+
+        for i in range(len(input_ids)):
+            ids_row = input_ids[i]
+            attn_row = attention_mask[i]
+            seg_row = token_type_ids[i]
+
+            for j in range(len(ids_row)):
+                if seg_row[j] == 1 and attn_row[j] == 1:
+                    attn_row[j] = 0
+                    ids_row[j] = pad_id
+
+        tokenized_examples["input_ids"] = input_ids
+        tokenized_examples["attention_mask"] = attention_mask
+    # <<< end question-only ablation >>>
+    
     # Since one example might give us several features if it has a long context, we need a map from a feature to
     # its corresponding example. This key gives us just that.
     sample_mapping = tokenized_examples.pop("overflow_to_sample_mapping")
