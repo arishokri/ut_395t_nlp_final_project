@@ -84,6 +84,13 @@ def main():
         default=None,
         help="Limit the number of examples to evaluate on.",
     )
+    # Additional parameter for the question only model training
+    argp.add_argument(
+    "--question_only",
+    action="store_true",
+    help="If set, mask out context tokens so model sees only the question.",
+)
+
 
     training_args, args = argp.parse_args_into_dataclasses()
 
