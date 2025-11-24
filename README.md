@@ -90,9 +90,22 @@ Pass `dataset:subset` to `--dataset` argument when using custom HF datasets.
 | HotpotQA<sup>[2]<sup>     | Electra-small | 1h30m        | NA             | 0.0 / 25.04  | 1.84 / 34.64 |
 | emrQA-msquad<sup>[3]<sup> | Electra-small | 1h:10m       | 50m            | 0.02 / 90.24 | 8.04 / 92.65 |
 
-\* train time on RTX 3090
+\* train time on RTX 3090Ti
 
-\*\* train time on RTX 5070 Ti
+\*\* train time on RTX 5070Ti
+
+**Model Ablations for emrQA**
+
+| Setting                          | EM    | F1    |
+| -------------------------------- | ----- | ----- |
+| _Without Fine-tuning_            |
+| complete                         | 0.02  | 8.04  |
+| question-only                    | 0.03  | 8.63  |
+| passage-only                     | 0.06  | 5.40  |
+| _Fine-tuned using complete data_ |
+| complete                         | 90.24 | 92.65 |
+| question-only                    | 0.04  | 6.47  |
+| passage-only                     | 6.76  | 14.59 |
 
 [1] GLUE: A Multi-Task Benchmark and Analysis Platform for Natural Language Understanding: [Article](https://arxiv.org/abs/1804.07461); [Dataset](https://huggingface.co/datasets/nyu-mll/glue)
 
@@ -139,3 +152,17 @@ python embed.py --do_eval \
 **Notes:**
 
 - When using base models or your own fine-tuned models you need to execute with `--sentence_transformer False` (default), otherwise use `--sentence_transformer True`
+
+### Results
+
+| Model                                    | Train Time\* | r@1   | r@5   | r@10  | MRR   |
+| ---------------------------------------- | ------------ | ----- | ----- | ----- | ----- |
+| bert-base-uncased                        | N/A          | 0.032 | 0.082 | 0.125 | 0.064 |
+| bert-base-uncased (pretrained embed)     | 5h:45m       | 0.037 | 0.096 | 0.138 | 0.072 |
+| LLukas22/all-mpnet-base-v2-embedding-all | N/A          | 0.304 | 0.606 | 0.724 | 0.442 |
+
+\* train time on RTX 3090Ti
+
+## To Debug
+
+To use VSCode debugpy simply modify and use `launch.json`. It is currently mofied to provide base debugging.
