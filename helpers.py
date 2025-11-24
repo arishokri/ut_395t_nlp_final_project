@@ -154,13 +154,17 @@ def compute_accuracy(eval_preds: EvalPrediction):
 # and finding the right offsets for the answer spans in the tokenized context (to use as labels).
 # Adapted from https://github.com/huggingface/transformers/blob/master/examples/pytorch/question-answering/run_qa.py
 def prepare_train_dataset_qa(
-    examples, tokenizer, dataset_name=None, max_seq_length=None, question_only: bool = False, passage_only: bool = False
+    examples,
+    tokenizer,
+    qa_mode: str,
+    dataset_name=None,
+    max_seq_length=None,
 ):
     questions = [q.lstrip() for q in examples["question"]]
     max_seq_length = tokenizer.model_max_length
 
     # If passage-only, destroy question content
-    if passage_only:
+    if qa_mode == "p_only":
         # generic question template so model doesn't find value in this
         questions = ["What is the answer?" for _ in questions]
 
@@ -179,7 +183,7 @@ def prepare_train_dataset_qa(
     )
 
     # >>> Question-only ablation: mask out context tokens <<<
-    if question_only and "token_type_ids" in tokenized_examples:
+    if qa_mode == "q_only" and "token_type_ids" in tokenized_examples:
         pad_id = tokenizer.pad_token_id
         input_ids = tokenized_examples["input_ids"]
         attention_mask = tokenized_examples["attention_mask"]
@@ -193,8 +197,8 @@ def prepare_train_dataset_qa(
             for j in range(len(ids_row)):
                 # In BERT/ELECTRA-style tokenizers: 0 = question, 1 = context
                 if seg_row[j] == 1 and attn_row[j] == 1:
-                    attn_row[j] = 0              # hide from attention
-                    ids_row[j] = pad_id          # optional: visually mark as PAD
+                    attn_row[j] = 0  # hide from attention
+                    ids_row[j] = pad_id  # optional: visually mark as PAD
 
         tokenized_examples["input_ids"] = input_ids
         tokenized_examples["attention_mask"] = attention_mask
@@ -264,17 +268,22 @@ def prepare_train_dataset_qa(
     return tokenized_examples
 
 
-def prepare_validation_dataset_qa(examples, tokenizer, dataset_name=None, question_only: bool = False, passage_only: bool = False):
+def prepare_validation_dataset_qa(
+    examples,
+    tokenizer,
+    qa_mode: str,
+    dataset_name=None,
+):
     questions = [q.lstrip() for q in examples["question"]]
     max_seq_length = tokenizer.model_max_length
 
     # same idea as training dataset
-    if passage_only:
+    if qa_mode == "p_only":
         questions = ["What is the answer?" for _ in questions]
-    
+
     # Preprocess based on dataset format
     contexts = prepare_dataset_for_evaluation(examples, dataset_name)
-    
+
     tokenized_examples = tokenizer(
         questions,
         contexts,
@@ -287,7 +296,7 @@ def prepare_validation_dataset_qa(examples, tokenizer, dataset_name=None, questi
     )
 
     # >>> Question-only ablation: mask out context tokens <<<
-    if question_only and "token_type_ids" in tokenized_examples:
+    if qa_mode == "q_only" and "token_type_ids" in tokenized_examples:
         pad_id = tokenizer.pad_token_id
         input_ids = tokenized_examples["input_ids"]
         attention_mask = tokenized_examples["attention_mask"]
