@@ -86,16 +86,12 @@ def main():
     )
     # Additional parameter for the question only model training
     argp.add_argument(
-    "--question_only",
-    action="store_true",
-    help="If set, mask out context tokens so model sees only the question.",
+        "--qa_mode",
+        type=str,
+        choices=["complete", "q_only", "p_only"],
+        default="complete",
+        help="If se to q_only, only uses questions, if set to p_only only uses passages. Otherwise uses full sentence.",
     )
-    argp.add_argument(
-    "--passage_only",
-    action="store_true",
-    help="Remove question content so the model sees only the passage.",
-    )
-
 
     training_args, args = argp.parse_args_into_dataclasses()
 
@@ -149,14 +145,14 @@ def main():
             if not param.is_contiguous():
                 param.data = param.data.contiguous()
     tokenizer = AutoTokenizer.from_pretrained(args.model, use_fast=True)
-
+    qa_mode = args.qa_mode
     # Select the dataset preprocessing function (these functions are defined in helpers.py)
     if args.task == "qa":
         prepare_train_dataset = lambda exs: prepare_train_dataset_qa(
-            exs, tokenizer, dataset_name
+            exs, tokenizer, qa_mode, dataset_name
         )
         prepare_eval_dataset = lambda exs: prepare_validation_dataset_qa(
-            exs, tokenizer, dataset_name
+            exs, tokenizer, qa_mode, dataset_name
         )
     elif args.task == "nli":
         prepare_train_dataset = prepare_eval_dataset = lambda exs: prepare_dataset_nli(
