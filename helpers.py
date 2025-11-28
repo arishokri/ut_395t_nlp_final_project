@@ -156,33 +156,33 @@ def compute_accuracy(eval_preds: EvalPrediction):
 
 # Attempt 2: 
 # >>> Question-only ablation: randomize contexts & add filler if needed <<<
-def randomize_contexts_by_cyclic_shift(contexts, filler_words, seed: int = 42):
-    n = len(contexts)
-    rng = random.Random(seed)
+# def randomize_contexts_by_cyclic_shift(contexts, filler_words, seed: int = 42):
+#     n = len(contexts)
+#     rng = random.Random(seed)
 
-    indices = list(range(n))
-    rng.shuffle(indices)  # random permutation: i -> indices[i]
+#     indices = list(range(n))
+#     rng.shuffle(indices)  # random permutation: i -> indices[i]
 
-    new_contexts = []
-    for i in range(n):
-        original = contexts[i]
-        target_len = len(original)
-        src = contexts[indices[i]]
+#     new_contexts = []
+#     for i in range(n):
+#         original = contexts[i]
+#         target_len = len(original)
+#         src = contexts[indices[i]]
 
-        ctx = src
-        if len(ctx) < target_len:
-            while len(ctx) < target_len:
-                filler = rng.choice(filler_words)
-                if ctx:
-                    ctx += " "
-                ctx += filler
-            ctx = ctx[:target_len]
-        elif len(ctx) > target_len:
-            ctx = ctx[:target_len]
+#         ctx = src
+#         if len(ctx) < target_len:
+#             while len(ctx) < target_len:
+#                 filler = rng.choice(filler_words)
+#                 if ctx:
+#                     ctx += " "
+#                 ctx += filler
+#             ctx = ctx[:target_len]
+#         elif len(ctx) > target_len:
+#             ctx = ctx[:target_len]
 
-        new_contexts.append(ctx)
+#         new_contexts.append(ctx)
 
-    return new_contexts
+#     return new_contexts
 
 # This function preprocesses a question answering dataset, tokenizing the question and context text
 # and finding the right offsets for the answer spans in the tokenized context (to use as labels).
@@ -205,12 +205,12 @@ def prepare_train_dataset_qa(
     # Preprocess based on dataset format
     contexts, normalized_answers = preprocess_dataset_for_qa(examples, dataset_name)
 
-    # >>> NEW: randomized-context variant for q_only! <<<
-    if qa_mode == "q_only":
-        # replace each context with another record's context,
-        # keeping the same length via pad/truncate
-        contexts = randomize_contexts_by_cyclic_shift(contexts, FILLER_WORDS, seed=42)
-        # NOTE: we are *not* changing normalized_answers here
+    # # >>> NEW: randomized-context variant for q_only! <<<
+    # if qa_mode == "q_only":
+    #     # replace each context with another record's context,
+    #     # keeping the same length via pad/truncate
+    #     contexts = randomize_contexts_by_cyclic_shift(contexts, FILLER_WORDS, seed=42)
+    #     # NOTE: we are *not* changing normalized_answers here
 
     tokenized_examples = tokenizer(
         questions,
@@ -224,25 +224,25 @@ def prepare_train_dataset_qa(
     )
 
     # >>> Question-only ablation: mask out context tokens <<<
-    # if qa_mode == "q_only" and "token_type_ids" in tokenized_examples:
-    #     pad_id = tokenizer.pad_token_id
-    #     input_ids = tokenized_examples["input_ids"]
-    #     attention_mask = tokenized_examples["attention_mask"]
-    #     token_type_ids = tokenized_examples["token_type_ids"]
+    if qa_mode == "q_only" and "token_type_ids" in tokenized_examples:
+        pad_id = tokenizer.pad_token_id
+        input_ids = tokenized_examples["input_ids"]
+        attention_mask = tokenized_examples["attention_mask"]
+        token_type_ids = tokenized_examples["token_type_ids"]
 
-    #     for i in range(len(input_ids)):
-    #         ids_row = input_ids[i]
-    #         attn_row = attention_mask[i]
-    #         seg_row = token_type_ids[i]
+        for i in range(len(input_ids)):
+            ids_row = input_ids[i]
+            attn_row = attention_mask[i]
+            seg_row = token_type_ids[i]
 
-    #         for j in range(len(ids_row)):
-    #             # In BERT/ELECTRA-style tokenizers: 0 = question, 1 = context
-    #             if seg_row[j] == 1 and attn_row[j] == 1:
-    #                 attn_row[j] = 0  # hide from attention
-    #                 ids_row[j] = pad_id  # optional: visually mark as PAD
+            for j in range(len(ids_row)):
+                # In BERT/ELECTRA-style tokenizers: 0 = question, 1 = context
+                if seg_row[j] == 1 and attn_row[j] == 1:
+                    attn_row[j] = 0  # hide from attention
+                    ids_row[j] = pad_id  # optional: visually mark as PAD
 
-    #     tokenized_examples["input_ids"] = input_ids
-    #     tokenized_examples["attention_mask"] = attention_mask
+        tokenized_examples["input_ids"] = input_ids
+        tokenized_examples["attention_mask"] = attention_mask
     # <<< end question-only ablation >>>
 
 
