@@ -16,6 +16,9 @@ python3 run.py --do_train --task nli --dataset snli --output_dir ./trained_model
 # With specific parameters
 python run.py --do_train --task qa --output_dir ./trained_models/qa/squad --num_train_epochs 3 --per_device_train_batch_size 16
 
+# To use custom seed (default=42)
+python run.py --task qa --do_train --output_dir ./model_output --seed 456
+
 ```
 
 Default model is ELECTRA-small.

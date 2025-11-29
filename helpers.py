@@ -205,6 +205,7 @@ def prepare_train_dataset_qa(
     # Preprocess based on dataset format
     contexts, normalized_answers = preprocess_dataset_for_qa(examples, dataset_name)
 
+    # comment out the question only type implementation to use
     # # >>> NEW: randomized-context variant for q_only! <<<
     # if qa_mode == "q_only":
     #     # replace each context with another record's context,
@@ -319,10 +320,6 @@ def prepare_validation_dataset_qa(
     questions = [q.lstrip() for q in examples["question"]]
     max_seq_length = tokenizer.model_max_length
 
-    # same idea as training dataset
-    if qa_mode == "p_only":
-        questions = ["What is the answer?" for _ in questions]
-
     # Preprocess based on dataset format
     contexts = prepare_dataset_for_evaluation(examples, dataset_name)
 
@@ -336,27 +333,6 @@ def prepare_validation_dataset_qa(
         return_offsets_mapping=True,
         padding="max_length",
     )
-
-    # >>> Question-only ablation: mask out context tokens <<<
-    if qa_mode == "q_only" and "token_type_ids" in tokenized_examples:
-        pad_id = tokenizer.pad_token_id
-        input_ids = tokenized_examples["input_ids"]
-        attention_mask = tokenized_examples["attention_mask"]
-        token_type_ids = tokenized_examples["token_type_ids"]
-
-        for i in range(len(input_ids)):
-            ids_row = input_ids[i]
-            attn_row = attention_mask[i]
-            seg_row = token_type_ids[i]
-
-            for j in range(len(ids_row)):
-                if seg_row[j] == 1 and attn_row[j] == 1:
-                    attn_row[j] = 0
-                    ids_row[j] = pad_id
-
-        tokenized_examples["input_ids"] = input_ids
-        tokenized_examples["attention_mask"] = attention_mask
-    # <<< end question-only ablation >>>
 
     # Since one example might give us several features if it has a long context, we need a map from a feature to
     # its corresponding example. This key gives us just that.
