@@ -19,6 +19,14 @@
         "--model",
         "${input:model}"
       ]
+    },
+    {
+      "name": "Embed",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "embed.py",
+      "console": "internalConsole",
+      "args": ["--do_eval", "--model", "./trainer_output"]
     }
   ],
   "inputs": [
