@@ -1,188 +1,43 @@
 import collections
-from collections import OrderedDict, defaultdict
 from typing import Tuple
 
-import random
 import numpy as np
 from tqdm.auto import tqdm
 from transformers import EvalPrediction, Trainer
-from transformers.trainer_utils import PredictionOutput
 
 QA_MAX_ANSWER_LENGTH = 30
 
-FILLER_WORDS = [
-    "the", "patient", "may", "have", "no", "significant", "history",
-    "of", "current", "presents", "with", "possible", "likely", "reports",
-    "denies", "for", "and", "or", "is"
-]
 
-def normalize_context_hotpotqa(context):
-    """Convert HotpotQA nested context format to a single string."""
-    if isinstance(context, dict) and "sentences" in context:
-        combined_sent = []
-        for sent_list in context["sentences"]:
-            combined = "\n".join(s.lstrip() for s in sent_list)
-            combined_sent.append(combined)
-        return "\n".join(c for c in combined_sent)
-    return context
-
-
-def normalize_answer_hotpotqa(answer_text, context):
-    """Convert HotpotQA answer format (single string) to SQuAD format (dict with lists)."""
-    # Find the answer span in the context
-    answer_start = context.find(answer_text)
-    if answer_start == -1:
-        # If exact match not found, try case-insensitive search
-        answer_start = context.lower().find(answer_text.lower())
-
-    return {
-        "text": [answer_text] if answer_start != -1 else [],
-        "answer_start": [answer_start] if answer_start != -1 else [],
-    }
-
-def preprocess_dataset_for_qa(examples, dataset_name=None):
-    """
-    Preprocess examples based on dataset format.
-    Returns: (contexts, normalized_answers)
-
-    Supported datasets:
-    - "squad" (default): standard SQuAD format
-    - "hotpotqa/hotpot_qa": HotpotQA format with nested contexts and single answer string
-    - "Eladio/emrqa-msquad": EMR-QA format
-    """
-    # Handle context normalization
-    if dataset_name and "hotpotqa" in dataset_name.lower():
-        # HotpotQA: nested context structure
-        contexts = [normalize_context_hotpotqa(ctx) for ctx in examples["context"]]
-    else:
-        # SQuAD and EMR-QA: context is already a string
-        contexts = examples["context"]
-
-    # Handle answer normalization
-    if dataset_name and "hotpotqa" in dataset_name.lower():
-        # HotpotQA: single answer string, need to find answer_start
-        normalized_answers = [
-            normalize_answer_hotpotqa(answer_text, contexts[i])
-            for i, answer_text in enumerate(examples["answer"])
-        ]
-    elif "answers" in examples:
-        # SQuAD and EMR-QA: already have answer_start
-        normalized_answers = examples["answers"]
-    elif "answer" in examples:
-        # Fallback: single answer field without dataset-specific handling
-        normalized_answers = [
-            normalize_answer_hotpotqa(answer_text, contexts[i])
-            for i, answer_text in enumerate(examples["answer"])
-        ]
-    else:
-        raise ValueError("Dataset must have either 'answer' or 'answers' field")
-
+def preprocess_dataset_for_qa(examples):
+    """Preprocess examples for EMR-QA dataset format."""
+    contexts = examples["context"]
+    normalized_answers = examples["answers"]
     return contexts, normalized_answers
 
 
-def prepare_dataset_for_evaluation(examples, dataset_name=None):
-    """
-    Prepare context for evaluation based on dataset format.
-    Returns: contexts (list of strings)
-    """
-    if dataset_name and "hotpotqa" in dataset_name.lower():
-        # HotpotQA: nested context structure
-        contexts = [normalize_context_hotpotqa(ctx) for ctx in examples["context"]]
-    else:
-        # SQuAD and EMR-QA: context is already a string
-        contexts = examples["context"]
-
-    return contexts
+def prepare_dataset_for_evaluation(examples):
+    """Prepare context for evaluation for EMR-QA dataset."""
+    return examples["context"]
 
 
-def normalize_answers_for_metrics(example, dataset_name=None):
-    """
-    Normalize answers for metric computation based on dataset format.
-    Returns: dict with "text" and "answer_start" lists
-    """
-    if dataset_name and "hotpotqa" in dataset_name.lower():
-        # HotpotQA format: single answer string
+def normalize_answers_for_metrics(example):
+    """Normalize answers for metric computation for EMR-QA dataset."""
+    ans = example["answers"]
+    # Case 1: dict with lists: {"text": [...], "answer_start": [...]}
+    if isinstance(ans, dict):
         return {
-            "text": [example["answer"]],
-            "answer_start": [0],  # Dummy value for compatibility
+            "text": ans.get("text", []),
+            "answer_start": ans.get("answer_start", []),
         }
-    elif "answers" in example:
-        ans = example["answers"]
-        # Case 1: dict with lists: {"text": [...], "answer_start": [...]}
-        if isinstance(ans, dict):
-            return {
-                "text": ans.get("text", []),
-                "answer_start": ans.get("answer_start", []),
-            }
-        # Case 2: list of dicts: [{"text": ..., "answer_start": ..., ...}, ...]
-        else:
-            texts = []
-            starts = []
-            for a in ans:
-                texts.append(a.get("text", ""))
-                starts.append(a.get("answer_start", 0))
-            return {"text": texts, "answer_start": starts}
+    # Case 2: list of dicts: [{"text": ..., "answer_start": ..., ...}, ...]
     else:
-        raise ValueError("Example must have either 'answer' or 'answers' field")
+        texts = []
+        starts = []
+        for a in ans:
+            texts.append(a.get("text", ""))
+            starts.append(a.get("answer_start", 0))
+        return {"text": texts, "answer_start": starts}
 
-
-# This function preprocesses an NLI dataset, tokenizing premises and hypotheses.
-def prepare_dataset_nli(examples, tokenizer, max_seq_length=None):
-    max_seq_length = (
-        tokenizer.model_max_length if max_seq_length is None else max_seq_length
-    )
-
-    tokenized_examples = tokenizer(
-        examples["premise"],
-        examples["hypothesis"],
-        truncation=True,
-        max_length=max_seq_length,
-        padding="max_length",
-    )
-
-    tokenized_examples["label"] = examples["label"]
-    return tokenized_examples
-
-
-# This function computes sentence-classification accuracy.
-# Functions with signatures like this one work as the "compute_metrics" argument of transformers.Trainer.
-def compute_accuracy(eval_preds: EvalPrediction):
-    return {
-        "accuracy": (np.argmax(eval_preds.predictions, axis=1) == eval_preds.label_ids)
-        .astype(np.float32)
-        .mean()
-        .item()
-    }
-
-# Attempt 2: 
-# >>> Question-only ablation: randomize contexts & add filler if needed <<<
-# def randomize_contexts_by_cyclic_shift(contexts, filler_words, seed: int = 42):
-#     n = len(contexts)
-#     rng = random.Random(seed)
-
-#     indices = list(range(n))
-#     rng.shuffle(indices)  # random permutation: i -> indices[i]
-
-#     new_contexts = []
-#     for i in range(n):
-#         original = contexts[i]
-#         target_len = len(original)
-#         src = contexts[indices[i]]
-
-#         ctx = src
-#         if len(ctx) < target_len:
-#             while len(ctx) < target_len:
-#                 filler = rng.choice(filler_words)
-#                 if ctx:
-#                     ctx += " "
-#                 ctx += filler
-#             ctx = ctx[:target_len]
-#         elif len(ctx) > target_len:
-#             ctx = ctx[:target_len]
-
-#         new_contexts.append(ctx)
-
-#     return new_contexts
 
 # This function preprocesses a question answering dataset, tokenizing the question and context text
 # and finding the right offsets for the answer spans in the tokenized context (to use as labels).
@@ -202,16 +57,8 @@ def prepare_train_dataset_qa(
         # generic question template so model doesn't find value in this
         questions = ["What is the answer?" for _ in questions]
 
-    # Preprocess based on dataset format
-    contexts, normalized_answers = preprocess_dataset_for_qa(examples, dataset_name)
-
-    # comment out the question only type implementation to use
-    # # >>> NEW: randomized-context variant for q_only! <<<
-    # if qa_mode == "q_only":
-    #     # replace each context with another record's context,
-    #     # keeping the same length via pad/truncate
-    #     contexts = randomize_contexts_by_cyclic_shift(contexts, FILLER_WORDS, seed=42)
-    #     # NOTE: we are *not* changing normalized_answers here
+    # Preprocess EMR-QA dataset
+    contexts, normalized_answers = preprocess_dataset_for_qa(examples)
 
     tokenized_examples = tokenizer(
         questions,
@@ -245,7 +92,6 @@ def prepare_train_dataset_qa(
         tokenized_examples["input_ids"] = input_ids
         tokenized_examples["attention_mask"] = attention_mask
     # <<< end question-only ablation >>>
-
 
     # Since one example might give us several features if it has a long context,
     # we need a map from a feature to its corresponding example.
@@ -320,8 +166,8 @@ def prepare_validation_dataset_qa(
     questions = [q.lstrip() for q in examples["question"]]
     max_seq_length = tokenizer.model_max_length
 
-    # Preprocess based on dataset format
-    contexts = prepare_dataset_for_evaluation(examples, dataset_name)
+    # Preprocess EMR-QA dataset
+    contexts = prepare_dataset_for_evaluation(examples)
 
     tokenized_examples = tokenizer(
         questions,
@@ -447,12 +293,8 @@ def postprocess_qa_predictions(
             prelim_predictions, key=lambda x: x["score"], reverse=True
         )[:n_best_size]
 
-        # Use the offsets to gather the answer text in the original context.
-        # Handle different context formats based on dataset
-        if dataset_name and "hotpotqa" in dataset_name.lower():
-            context = normalize_context_hotpotqa(example["context"])
-        else:
-            context = example["context"]
+        # Use the offsets to gather the answer text in the original context (EMR-QA format)
+        context = example["context"]
 
         for pred in predictions:
             offsets = pred.pop("offsets")
@@ -518,7 +360,7 @@ class QuestionAnsweringTrainer(Trainer):
             # Normalize answers based on dataset format
             references = []
             for ex in eval_examples:
-                cleaned_answers = normalize_answers_for_metrics(ex, self.dataset_name)
+                cleaned_answers = normalize_answers_for_metrics(ex)
                 references.append({"id": ex["id"], "answers": cleaned_answers})
 
             # compute the metrics according to the predictions and references

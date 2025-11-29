@@ -5,17 +5,13 @@ import datasets
 import evaluate
 from transformers import (
     AutoModelForQuestionAnswering,
-    AutoModelForSequenceClassification,
     AutoTokenizer,
     HfArgumentParser,
-    Trainer,
     TrainingArguments,
 )
 
 from helpers import (
     QuestionAnsweringTrainer,
-    compute_accuracy,
-    prepare_dataset_nli,
     prepare_train_dataset_qa,
     prepare_validation_dataset_qa,
 )
@@ -50,21 +46,7 @@ def main():
         This should either be a HuggingFace model ID (see https://huggingface.co/models)
         or a path to a saved model checkpoint (a folder containing config.json and pytorch_model.bin).""",
     )
-    argp.add_argument(
-        "--task",
-        type=str,
-        choices=["nli", "qa"],
-        required=True,
-        help="""This argument specifies which task to train/evaluate on.
-        Pass "nli" for natural language inference or "qa" for question answering.
-        By default, "nli" will use the SNLI dataset, and "qa" will use the SQuAD dataset.""",
-    )
-    argp.add_argument(
-        "--dataset",
-        type=str,
-        default=None,
-        help="""This argument overrides the default dataset used for the specified task.""",
-    )
+
     argp.add_argument(
         "--max_length",
         type=int,
@@ -90,55 +72,22 @@ def main():
         type=str,
         choices=["complete", "q_only", "p_only"],
         default="complete",
-        help="If se to q_only, only uses questions, if set to p_only only uses passages. Otherwise uses full sentence.",
+        help="If set to q_only, only uses questions, if set to p_only only uses passages. Otherwise uses full sentence.",
     )
 
     training_args, args = argp.parse_args_into_dataclasses()
 
-    # Dataset selection
-    # IMPORTANT: this code path allows you to load custom datasets different from the standard SQuAD or SNLI ones.
-    # You need to format the dataset appropriately. For SNLI, you can prepare a file with each line containing one
-    # example as follows:
-    # {"premise": "Two women are embracing.", "hypothesis": "The sisters are hugging.", "label": 1}
-    if args.dataset and (
-        args.dataset.endswith(".json") or args.dataset.endswith(".jsonl")
-    ):
-        dataset_id = None
-        dataset_name = args.dataset
-        # Load from local json/jsonl file
-        dataset = datasets.load_dataset("json", data_files=args.dataset)
-        # By default, the "json" dataset loader places all examples in the train split,
-        # so if we want to use a jsonl file for evaluation we need to get the "train" split
-        # from the loaded dataset
-        eval_split = "train"
-    else:
-        default_datasets = {"qa": ("squad",), "nli": ("snli",)}
-        dataset_id = (
-            tuple(args.dataset.split(":"))
-            if args.dataset
-            else default_datasets[args.task]
-        )
-        dataset_name = (
-            args.dataset if args.dataset else ("squad" if args.task == "qa" else "snli")
-        )
-        # MNLI has two validation splits (one with matched domains and one with mismatched domains). Most datasets just have one "validation" split
-        eval_split = (
-            "validation_matched" if dataset_id == ("glue", "mnli") else "validation"
-        )
-        # Load the raw data
-        dataset = datasets.load_dataset(*dataset_id)
+    # Dataset selection - only emrqa supported
+    dataset_name = "emrqa"
+    # Load from local json/jsonl file
+    dataset = datasets.load_dataset("json", data_files="emrqa")
+    # By default, the "json" dataset loader places all examples in the train split,
+    # so if we want to use a jsonl file for evaluation we need to get the "train" split
+    # from the loaded dataset
+    eval_split = "train"
 
-    # NLI models need to have the output label count specified (label 0 is "entailed", 1 is "neutral", and 2 is "contradiction")
-    task_kwargs = {"num_labels": 3} if args.task == "nli" else {}
-
-    # Here we select the right model fine-tuning head
-    model_classes = {
-        "qa": AutoModelForQuestionAnswering,
-        "nli": AutoModelForSequenceClassification,
-    }
-    model_class = model_classes[args.task]
     # Initialize the model and tokenizer from the specified pretrained model/checkpoint
-    model = model_class.from_pretrained(args.model, **task_kwargs)
+    model = AutoModelForQuestionAnswering.from_pretrained(args.model)
     # Make tensor contiguous if needed https://github.com/huggingface/transformers/issues/28293
     if hasattr(model, "electra"):
         for param in model.electra.parameters():
@@ -147,36 +96,23 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(args.model, use_fast=True)
     qa_mode = args.qa_mode
     # Select the dataset preprocessing function (these functions are defined in helpers.py)
-    if args.task == "qa":
-        prepare_train_dataset = lambda exs: prepare_train_dataset_qa(
-            exs, tokenizer, qa_mode, dataset_name
-        )
-        prepare_eval_dataset = lambda exs: prepare_validation_dataset_qa(
-            exs, tokenizer, qa_mode, dataset_name
-        )
-    elif args.task == "nli":
-        prepare_train_dataset = prepare_eval_dataset = lambda exs: prepare_dataset_nli(
-            exs, tokenizer, args.max_length
-        )
-        # prepare_eval_dataset = prepare_dataset_nli
-    else:
-        raise ValueError("Unrecognized task name: {}".format(args.task))
+    prepare_train_dataset = lambda exs: prepare_train_dataset_qa(
+        exs, tokenizer, qa_mode, dataset_name
+    )
+    prepare_eval_dataset = lambda exs: prepare_validation_dataset_qa(
+        exs, tokenizer, qa_mode, dataset_name
+    )
 
     print(
         "Preprocessing data... (this takes a little bit, should only happen once per dataset)"
     )
-    if dataset_id == ("snli",):
-        # remove SNLI examples with no label
-        dataset = dataset.filter(lambda ex: ex["label"] != -1)
 
-    # Dataset-specific preprocessing
-    if dataset_name and "emrqa" in dataset_name.lower():
-        # EMR-QA: Add ID column if missing
-        for split in dataset.keys():
-            if "id" not in dataset[split].column_names:
-                dataset[split] = dataset[split].map(
-                    lambda ex, idx: {"id": str(idx)}, with_indices=True
-                )
+    # EMR-QA: Add ID column if missing
+    for split in dataset.keys():
+        if "id" not in dataset[split].column_names:
+            dataset[split] = dataset[split].map(
+                lambda ex, idx: {"id": str(idx)}, with_indices=True
+            )
 
     train_dataset = None
     eval_dataset = None
@@ -196,8 +132,8 @@ def main():
         eval_dataset = dataset[eval_split]
         if args.max_eval_samples:
             eval_dataset = eval_dataset.select(range(args.max_eval_samples))
-        # Add ID column if missing (for all QA datasets)
-        if args.task == "qa" and "id" not in eval_dataset.column_names:
+        # Add ID column if missing
+        if "id" not in eval_dataset.column_names:
             eval_dataset = eval_dataset.map(
                 lambda ex, idx: {"id": str(idx)}, with_indices=True
             )
@@ -209,24 +145,15 @@ def main():
         )
 
     # Select the training configuration
-    trainer_class = Trainer
-    eval_kwargs = {}
-    trainer_kwargs = {}
-    # If you want to use custom metrics, you should define your own "compute_metrics" function.
-    # For an example of a valid compute_metrics function, see compute_accuracy in helpers.py.
-    compute_metrics = None
-    if args.task == "qa":
-        # For QA, we need to use a tweaked version of the Trainer (defined in helpers.py)
-        # to enable the question-answering specific evaluation metrics
-        trainer_class = QuestionAnsweringTrainer
-        eval_kwargs["eval_examples"] = eval_dataset
-        trainer_kwargs["dataset_name"] = dataset_name
-        metric = evaluate.load("squad")  # datasets.load_metric() deprecated
-        compute_metrics = lambda eval_preds: metric.compute(
-            predictions=eval_preds.predictions, references=eval_preds.label_ids
-        )
-    elif args.task == "nli":
-        compute_metrics = compute_accuracy
+    # For QA, we need to use a tweaked version of the Trainer (defined in helpers.py)
+    # to enable the question-answering specific evaluation metrics
+    trainer_class = QuestionAnsweringTrainer
+    eval_kwargs = {"eval_examples": eval_dataset}
+    trainer_kwargs = {"dataset_name": dataset_name}
+    metric = evaluate.load("squad")
+    compute_metrics = lambda eval_preds: metric.compute(
+        predictions=eval_preds.predictions, references=eval_preds.label_ids
+    )
 
     # This function wraps the compute_metrics function, storing the model's predictions
     # so that they can be dumped along with the computed metrics
@@ -285,29 +212,17 @@ def main():
             encoding="utf-8",
             mode="w",
         ) as f:
-            if args.task == "qa":
-                predictions_by_id = {
-                    pred["id"]: pred["prediction_text"]
-                    for pred in eval_predictions.predictions
-                }
-                for example in eval_dataset:
-                    example_with_prediction = dict(example)
-                    example_with_prediction["predicted_answer"] = predictions_by_id[
-                        example["id"]
-                    ]
-                    f.write(json.dumps(example_with_prediction))
-                    f.write("\n")
-            else:
-                for i, example in enumerate(eval_dataset):
-                    example_with_prediction = dict(example)
-                    example_with_prediction["predicted_scores"] = (
-                        eval_predictions.predictions[i].tolist()
-                    )
-                    example_with_prediction["predicted_label"] = int(
-                        eval_predictions.predictions[i].argmax()
-                    )
-                    f.write(json.dumps(example_with_prediction))
-                    f.write("\n")
+            predictions_by_id = {
+                pred["id"]: pred["prediction_text"]
+                for pred in eval_predictions.predictions
+            }
+            for example in eval_dataset:
+                example_with_prediction = dict(example)
+                example_with_prediction["predicted_answer"] = predictions_by_id[
+                    example["id"]
+                ]
+                f.write(json.dumps(example_with_prediction))
+                f.write("\n")
 
 
 if __name__ == "__main__":
