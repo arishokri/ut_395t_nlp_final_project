@@ -2,7 +2,6 @@ import json
 import os
 
 import datasets
-import evaluate
 from transformers import (
     AutoModelForQuestionAnswering,
     AutoTokenizer,
@@ -12,6 +11,7 @@ from transformers import (
 
 from helpers import (
     QuestionAnsweringTrainer,
+    compute_metrics,
     prepare_train_dataset_qa,
     prepare_validation_dataset_qa,
 )
@@ -34,9 +34,8 @@ def main():
     #     For reference, with --max_length=128 and the default ELECTRA-small model, a batch size of 32 should fit in 4gb of GPU memory.
     # --num_train_epochs <float, default=3.0>
     #     How many passes to do through the training data.
-    # --output_dir <path>
+    # --output_dir <path, default="trainer_output/">
     #     Where to put the trained model checkpoint(s) and any eval predictions.
-    #     *This argument is required*.
 
     argp.add_argument(
         "--model",
@@ -46,7 +45,12 @@ def main():
         This should either be a HuggingFace model ID (see https://huggingface.co/models)
         or a path to a saved model checkpoint (a folder containing config.json and pytorch_model.bin).""",
     )
-
+    argp.add_argument(
+        "--dataset",
+        type=str,
+        default="Eladio/emrqa-msquad",
+        help="""This argument overrides the default dataset.""",
+    )
     argp.add_argument(
         "--max_length",
         type=int,
@@ -68,51 +72,68 @@ def main():
     )
     # Additional parameter for the question only model training
     argp.add_argument(
-        "--qa_mode",
+        "--ablations",
         type=str,
-        choices=["complete", "q_only", "p_only"],
-        default="complete",
-        help="If set to q_only, only uses questions, if set to p_only only uses passages. Otherwise uses full sentence.",
+        choices=["none", "q_only", "p_only"],
+        default="none",
+        help="If se to q_only, only uses questions, if set to p_only only uses passages. Otherwise uses full sentence.",
     )
 
     training_args, args = argp.parse_args_into_dataclasses()
 
-    # Dataset selection - only emrqa supported
-    dataset_name = "emrqa"
-    # Load from local json/jsonl file
-    dataset = datasets.load_dataset("json", data_files="emrqa")
-    # By default, the "json" dataset loader places all examples in the train split,
-    # so if we want to use a jsonl file for evaluation we need to get the "train" split
-    # from the loaded dataset
-    eval_split = "train"
+    # Dataset selection
+    # IMPORTANT: this code path allows you to load custom datasets different from the standard SQuAD or SNLI ones.
+    # You need to format the dataset appropriately. For SNLI, you can prepare a file with each line containing one
+    # example as follows:
+    # {"premise": "Two women are embracing.", "hypothesis": "The sisters are hugging.", "label": 1}
+    dataset_name = args.dataset
+    if args.dataset.endswith(".json") or args.dataset.endswith(".jsonl"):
+        dataset_id = None
+        # Load from local json/jsonl file
+        dataset = datasets.load_dataset("json", data_files=args.dataset)
+        # By default, the "json" dataset loader places all examples in the train split,
+        # so if we want to use a jsonl file for evaluation we need to get the "train" split
+        # from the loaded dataset
+        eval_split = "train"
+    else:
+        dataset_id = tuple(args.dataset.split(":"))
+        eval_split = (
+            "validation_matched" if dataset_id == ("glue", "mnli") else "validation"
+        )
+        # Load the raw data
+        dataset = datasets.load_dataset(*dataset_id)
 
+    # TODO: Is this the correct way of initializing this class?
+    model_class = AutoModelForQuestionAnswering  # Fine-tuning head for QA task.
     # Initialize the model and tokenizer from the specified pretrained model/checkpoint
-    model = AutoModelForQuestionAnswering.from_pretrained(args.model)
+    model = model_class.from_pretrained(args.model)
     # Make tensor contiguous if needed https://github.com/huggingface/transformers/issues/28293
     if hasattr(model, "electra"):
         for param in model.electra.parameters():
             if not param.is_contiguous():
                 param.data = param.data.contiguous()
     tokenizer = AutoTokenizer.from_pretrained(args.model, use_fast=True)
-    qa_mode = args.qa_mode
+    ablations = args.ablations
     # Select the dataset preprocessing function (these functions are defined in helpers.py)
+    # TODO: Get rid of these lambda functions and rename the main function to remove qa.
     prepare_train_dataset = lambda exs: prepare_train_dataset_qa(
-        exs, tokenizer, qa_mode, dataset_name
+        exs, tokenizer, ablations
     )
-    prepare_eval_dataset = lambda exs: prepare_validation_dataset_qa(
-        exs, tokenizer, qa_mode, dataset_name
-    )
-
+    prepare_eval_dataset = lambda exs: prepare_validation_dataset_qa(exs, tokenizer)
     print(
         "Preprocessing data... (this takes a little bit, should only happen once per dataset)"
     )
 
-    # EMR-QA: Add ID column if missing
-    for split in dataset.keys():
-        if "id" not in dataset[split].column_names:
-            dataset[split] = dataset[split].map(
-                lambda ex, idx: {"id": str(idx)}, with_indices=True
-            )
+    # Dataset-specific preprocessing
+    # TODO: make sure this id is deterministic. Maybe use hashing. Important for Cartography
+    # TODO: exact match for dataset name here.
+    if "emrqa" in dataset_name.lower():
+        # EMR-QA: Add ID column if missing
+        for split in dataset.keys():
+            if "id" not in dataset[split].column_names:
+                dataset[split] = dataset[split].map(
+                    lambda ex, idx: {"id": str(idx)}, with_indices=True
+                )
 
     train_dataset = None
     eval_dataset = None
@@ -132,11 +153,6 @@ def main():
         eval_dataset = dataset[eval_split]
         if args.max_eval_samples:
             eval_dataset = eval_dataset.select(range(args.max_eval_samples))
-        # Add ID column if missing
-        if "id" not in eval_dataset.column_names:
-            eval_dataset = eval_dataset.map(
-                lambda ex, idx: {"id": str(idx)}, with_indices=True
-            )
         eval_dataset_featurized = eval_dataset.map(
             prepare_eval_dataset,
             batched=True,
@@ -145,16 +161,14 @@ def main():
         )
 
     # Select the training configuration
+    trainer_kwargs = {}
+    eval_kwargs = {}
+    # For an example of a valid compute_metrics function, see compute_metrics in helpers.py.
     # For QA, we need to use a tweaked version of the Trainer (defined in helpers.py)
     # to enable the question-answering specific evaluation metrics
-    trainer_class = QuestionAnsweringTrainer
-    eval_kwargs = {"eval_examples": eval_dataset}
-    trainer_kwargs = {"dataset_name": dataset_name}
-    metric = evaluate.load("squad")
-    compute_metrics = lambda eval_preds: metric.compute(
-        predictions=eval_preds.predictions, references=eval_preds.label_ids
-    )
+    eval_kwargs["eval_examples"] = eval_dataset
 
+    # TODO: Why are we doing this?
     # This function wraps the compute_metrics function, storing the model's predictions
     # so that they can be dumped along with the computed metrics
     eval_predictions = None
@@ -165,7 +179,7 @@ def main():
         return compute_metrics(eval_preds)
 
     # Initialize the Trainer object with the specified arguments and the model and dataset we loaded above
-    trainer = trainer_class(
+    trainer = QuestionAnsweringTrainer(
         model=model,
         args=training_args,
         train_dataset=train_dataset_featurized,
@@ -188,7 +202,7 @@ def main():
     if training_args.do_eval:
         results = trainer.evaluate(**eval_kwargs)
 
-        # To add custom metrics, you should replace the "compute_metrics" function (see comments above).
+        # To add custom metrics, you should replace the "compute_metrics" function (see helpers).
         #
         # If you want to change how predictions are computed, you should subclass Trainer and override the "prediction_step"
         # method (see https://huggingface.co/transformers/_modules/transformers/trainer.html#Trainer.prediction_step).

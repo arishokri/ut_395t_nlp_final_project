@@ -5,49 +5,34 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Task1",
+      "name": "Train",
       "type": "debugpy",
       "request": "launch",
       "program": "run.py",
       "console": "internalConsole",
       "args": [
-        "--do_eval",
-        "--task",
-        "${input:task}",
-        "--dataset",
-        "${input:dataset}",
-        "--model",
-        "${input:model}"
+        "--do_train",
+        "--ablations",
+        "${input:ablations}",
+        "--max_train_samples",
+        "1000"
       ]
     },
     {
-      "name": "Embed",
+      "name": "Eval",
       "type": "debugpy",
       "request": "launch",
-      "program": "embed.py",
+      "program": "run.py",
       "console": "internalConsole",
-      "args": ["--do_eval", "--model", "./trainer_output"]
+      "args": ["--do_eval", "--max_eval_samples", "1000"]
     }
   ],
   "inputs": [
     {
-      "id": "task",
+      "id": "ablations",
       "type": "pickString",
-      "options": ["nli", "qa"],
-      "default": "nli",
-      "description": "Pick a task"
-    },
-    {
-      "id": "dataset",
-      "type": "promptString",
-      "default": "None",
-      "description": "Dataset (leave blank for defaults)"
-    },
-    {
-      "id": "model",
-      "type": "promptString",
-      "default": "None",
-      "description": "Model (leave blank for defaults)"
+      "options": ["none", "q_only", "p_only"],
+      "description": "Pick an ablations strategy."
     }
   ]
 }

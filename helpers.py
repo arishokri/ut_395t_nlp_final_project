@@ -1,42 +1,102 @@
 import collections
 from typing import Tuple
 
+import evaluate
 import numpy as np
 from tqdm.auto import tqdm
 from transformers import EvalPrediction, Trainer
 
 QA_MAX_ANSWER_LENGTH = 30
 
+FILLER_WORDS = [
+    "the",
+    "patient",
+    "may",
+    "have",
+    "no",
+    "significant",
+    "history",
+    "of",
+    "current",
+    "presents",
+    "with",
+    "possible",
+    "likely",
+    "reports",
+    "denies",
+    "for",
+    "and",
+    "or",
+    "is",
+]
 
-def preprocess_dataset_for_qa(examples):
-    """Preprocess examples for EMR-QA dataset format."""
-    contexts = examples["context"]
-    normalized_answers = examples["answers"]
-    return contexts, normalized_answers
 
-
-def prepare_dataset_for_evaluation(examples):
-    """Prepare context for evaluation for EMR-QA dataset."""
-    return examples["context"]
-
-
+# TODO: needs debugging to simplify the logic.
 def normalize_answers_for_metrics(example):
-    """Normalize answers for metric computation for EMR-QA dataset."""
-    ans = example["answers"]
-    # Case 1: dict with lists: {"text": [...], "answer_start": [...]}
-    if isinstance(ans, dict):
-        return {
-            "text": ans.get("text", []),
-            "answer_start": ans.get("answer_start", []),
-        }
-    # Case 2: list of dicts: [{"text": ..., "answer_start": ..., ...}, ...]
+    """
+    Normalize answers for metric computation based on dataset format.
+    Returns: dict with "text" and "answer_start" lists
+    """
+    if "answers" in example:
+        ans = example["answers"]
+        # Case 1: dict with lists: {"text": [...], "answer_start": [...]}
+        if isinstance(ans, dict):
+            return {
+                "text": ans.get("text", []),
+                "answer_start": ans.get("answer_start", []),
+            }
+        # Case 2: list of dicts: [{"text": ..., "answer_start": ..., ...}, ...]
+        else:
+            texts = []
+            starts = []
+            for a in ans:
+                texts.append(a.get("text", ""))
+                starts.append(a.get("answer_start", 0))
+            return {"text": texts, "answer_start": starts}
     else:
-        texts = []
-        starts = []
-        for a in ans:
-            texts.append(a.get("text", ""))
-            starts.append(a.get("answer_start", 0))
-        return {"text": texts, "answer_start": starts}
+        raise ValueError("Example must have either 'answer' or 'answers' field")
+
+
+# Functions with signatures like this one work as the "compute_metrics" argument of transformers.Trainer.
+def compute_metrics(eval_preds: EvalPrediction):
+    metric = evaluate.load("squad")
+    return metric.compute(
+        predictions=eval_preds.predictions, references=eval_preds.label_ids
+    )
+
+
+# Attempt 2:
+# >>> Question-only ablation: randomize contexts & add filler if needed <<<
+# import random
+
+
+# def randomize_contexts_by_cyclic_shift(contexts, filler_words, seed: int = 42):
+#     n = len(contexts)
+#     rng = random.Random(seed)
+
+#     indices = list(range(n))
+#     rng.shuffle(indices)  # random permutation: i -> indices[i]
+
+#     new_contexts = []
+#     for i in range(n):
+#         original = contexts[i]
+#         target_len = len(original)
+#         src = contexts[indices[i]]
+
+#         ctx = src
+#         if len(ctx) < target_len:
+#             while len(ctx) < target_len:
+#                 filler = rng.choice(filler_words)
+#                 if ctx:
+#                     ctx += " "
+#                 ctx += filler
+#             ctx = ctx[:target_len]
+#         elif len(ctx) > target_len:
+#             ctx = ctx[:target_len]
+
+#         new_contexts.append(ctx)
+
+#     return new_contexts
 
 
 # This function preprocesses a question answering dataset, tokenizing the question and context text
@@ -45,20 +105,26 @@ def normalize_answers_for_metrics(example):
 def prepare_train_dataset_qa(
     examples,
     tokenizer,
-    qa_mode: str,
-    dataset_name=None,
+    ablations: str,
     max_seq_length=None,
 ):
     questions = [q.lstrip() for q in examples["question"]]
+    contexts = examples["context"]
+    normalized_answers = examples["answers"]
     max_seq_length = tokenizer.model_max_length
 
     # If passage-only, destroy question content
-    if qa_mode == "p_only":
+    if ablations == "p_only":
         # generic question template so model doesn't find value in this
         questions = ["What is the answer?" for _ in questions]
 
-    # Preprocess EMR-QA dataset
-    contexts, normalized_answers = preprocess_dataset_for_qa(examples)
+    # comment out the question only type implementation to use
+    # # >>> NEW: randomized-context variant for q_only! <<<
+    # if ablations == "q_only":
+    #     # replace each context with another record's context,
+    #     # keeping the same length via pad/truncate
+    #     contexts = randomize_contexts_by_cyclic_shift(contexts, FILLER_WORDS, seed=42)
+    #     # NOTE: we are *not* changing answers here
 
     tokenized_examples = tokenizer(
         questions,
@@ -72,7 +138,7 @@ def prepare_train_dataset_qa(
     )
 
     # >>> Question-only ablation: mask out context tokens <<<
-    if qa_mode == "q_only" and "token_type_ids" in tokenized_examples:
+    if ablations == "q_only" and "token_type_ids" in tokenized_examples:
         pad_id = tokenizer.pad_token_id
         input_ids = tokenized_examples["input_ids"]
         attention_mask = tokenized_examples["attention_mask"]
@@ -160,14 +226,10 @@ def prepare_train_dataset_qa(
 def prepare_validation_dataset_qa(
     examples,
     tokenizer,
-    qa_mode: str,
-    dataset_name=None,
 ):
     questions = [q.lstrip() for q in examples["question"]]
+    contexts = examples["context"]
     max_seq_length = tokenizer.model_max_length
-
-    # Preprocess EMR-QA dataset
-    contexts = prepare_dataset_for_evaluation(examples)
 
     tokenized_examples = tokenizer(
         questions,
@@ -214,7 +276,6 @@ def postprocess_qa_predictions(
     examples,
     features,
     predictions: Tuple[np.ndarray, np.ndarray],
-    dataset_name=None,
     n_best_size: int = 20,
 ):
     if len(predictions) != 2:
@@ -293,9 +354,9 @@ def postprocess_qa_predictions(
             prelim_predictions, key=lambda x: x["score"], reverse=True
         )[:n_best_size]
 
-        # Use the offsets to gather the answer text in the original context (EMR-QA format)
         context = example["context"]
 
+        # Use the offsets to gather the answer text in the original context.
         for pred in predictions:
             offsets = pred.pop("offsets")
             pred["text"] = context[offsets[0] : offsets[1]]
@@ -315,10 +376,9 @@ def postprocess_qa_predictions(
 
 # Adapted from https://github.com/huggingface/transformers/blob/master/examples/pytorch/question-answering/trainer_qa.py
 class QuestionAnsweringTrainer(Trainer):
-    def __init__(self, *args, eval_examples=None, dataset_name=None, **kwargs):
+    def __init__(self, *args, eval_examples=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.eval_examples = eval_examples
-        self.dataset_name = dataset_name
 
     def evaluate(
         self,
@@ -351,7 +411,7 @@ class QuestionAnsweringTrainer(Trainer):
             # post process the raw predictions to get the final prediction
             # (from start_logits, end_logits to an answer string)
             eval_preds = postprocess_qa_predictions(
-                eval_examples, eval_dataset, output.predictions, self.dataset_name
+                eval_examples, eval_dataset, output.predictions
             )
             formatted_predictions = [
                 {"id": k, "prediction_text": v} for k, v in eval_preds.items()
