@@ -17,6 +17,7 @@ from helpers import (
     prepare_train_dataset_qa,
     prepare_validation_dataset_qa,
 )
+from dataset_cartography import DatasetCartographyCallback
 
 NUM_PREPROCESSING_WORKERS = 2
 
@@ -79,6 +80,17 @@ def main():
         choices=["none", "q_only", "p_only"],
         default="none",
         help="If se to q_only, only uses questions, if set to p_only only uses passages. Otherwise uses full sentence.",
+    )
+    argp.add_argument(
+        "--enable_cartography",
+        action="store_true",
+        help="Enable dataset cartography tracking during training to identify easy/hard/ambiguous examples.",
+    )
+    argp.add_argument(
+        "--cartography_output_dir",
+        type=str,
+        default="./cartography_output",
+        help="Directory to save cartography outputs.",
     )
 
     training_args, args = argp.parse_args_into_dataclasses()
@@ -166,6 +178,19 @@ def main():
     # to enable the question-answering specific evaluation metrics
     eval_kwargs["eval_examples"] = eval_dataset
 
+    # Initialize cartography callback if enabled
+    cartography_callback = None
+    if args.enable_cartography and training_args.do_train:
+        cartography_callback = DatasetCartographyCallback(
+            output_dir=args.cartography_output_dir
+        )
+        print(f"\n{'='*70}")
+        print("DATASET CARTOGRAPHY ENABLED")
+        print(f"{'='*70}")
+        print(f"Output directory: {args.cartography_output_dir}")
+        print("Training dynamics will be tracked across epochs.")
+        print(f"{'='*70}\n")
+
     # TODO: Why are we doing this?
     # This function wraps the compute_metrics function, storing the model's predictions
     # so that they can be dumped along with the computed metrics
@@ -184,6 +209,7 @@ def main():
         eval_dataset=eval_dataset_featurized,
         processing_class=tokenizer,
         compute_metrics=compute_metrics_and_store_predictions,
+        callbacks=[cartography_callback] if cartography_callback is not None else [],
         **trainer_kwargs,
     )
     # Train and/or evaluate

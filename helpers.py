@@ -119,6 +119,7 @@ def prepare_train_dataset_qa(
     questions = [q.lstrip() for q in examples["question"]]
     contexts = examples["context"]
     normalized_answers = examples["answers"]
+    example_ids = examples.get("id", [None] * len(questions))  # Get example IDs
     max_seq_length = tokenizer.model_max_length
 
     # If passage-only, destroy question content
@@ -177,6 +178,7 @@ def prepare_train_dataset_qa(
 
     tokenized_examples["start_positions"] = []
     tokenized_examples["end_positions"] = []
+    tokenized_examples["example_id"] = []  # Track example IDs for cartography
 
     for i, offsets in enumerate(offset_mapping):
         input_ids = tokenized_examples["input_ids"][i]
@@ -187,6 +189,12 @@ def prepare_train_dataset_qa(
         sample_index = sample_mapping[i]
         # get the answer for a feature
         answers = normalized_answers[sample_index]
+
+        # Add example ID for cartography tracking
+        if example_ids[sample_index] is not None:
+            tokenized_examples["example_id"].append(example_ids[sample_index])
+        else:
+            tokenized_examples["example_id"].append(f"example_{sample_index}")
 
         if len(answers["answer_start"]) == 0:
             tokenized_examples["start_positions"].append(cls_index)
@@ -387,6 +395,74 @@ class QuestionAnsweringTrainer(Trainer):
     def __init__(self, *args, eval_examples=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.eval_examples = eval_examples
+
+    def _remove_unused_columns(self, dataset, description=None):
+        """Override to preserve example_id for cartography tracking."""
+        # Check if we need to preserve example_id for cartography
+        from dataset_cartography import DatasetCartographyCallback
+
+        has_cartography = any(
+            isinstance(cb, DatasetCartographyCallback)
+            for cb in self.callback_handler.callbacks
+        )
+
+        if has_cartography and "example_id" in dataset.column_names:
+            # Temporarily add example_id to the model's signature so it won't be removed
+            if self.args.remove_unused_columns:
+                signature_columns = list(self._signature_columns) + ["example_id"]
+                original_signature = self._signature_columns
+                self._signature_columns = signature_columns
+                result = super()._remove_unused_columns(dataset, description)
+                self._signature_columns = original_signature
+                return result
+
+        return super()._remove_unused_columns(dataset, description)
+
+    def compute_loss(
+        self, model, inputs, return_outputs=False, num_items_in_batch=None
+    ):
+        """
+        Override compute_loss to track training dynamics for dataset cartography.
+        """
+        # Get the original loss
+        outputs = model(**inputs)
+        loss = outputs.loss
+
+        # Track training dynamics if cartography is enabled
+        # Find cartography callback from registered callbacks
+        # TODO: move imports to the top.
+        from dataset_cartography import DatasetCartographyCallback
+
+        cartography_callback = None
+        for callback in self.callback_handler.callbacks:
+            if isinstance(callback, DatasetCartographyCallback):
+                cartography_callback = callback
+                break
+
+        if cartography_callback is not None and self.args.do_train:
+            # Extract necessary tensors
+            start_logits = outputs.start_logits
+            end_logits = outputs.end_logits
+            start_positions = inputs.get("start_positions")
+            end_positions = inputs.get("end_positions")
+
+            # Get example IDs from the batch
+            # Note: We need to add example_id to the dataset during preprocessing
+            example_ids = inputs.get("example_id")
+
+            if example_ids is not None and start_positions is not None:
+                epoch = int(self.state.epoch) if self.state.epoch is not None else 0
+
+                cartography_callback.record_batch_dynamics(
+                    example_ids=example_ids,
+                    start_logits=start_logits,
+                    end_logits=end_logits,
+                    start_positions=start_positions,
+                    end_positions=end_positions,
+                    epoch=epoch,
+                )
+
+        return (loss, outputs) if return_outputs else loss
 
     def evaluate(
         self,

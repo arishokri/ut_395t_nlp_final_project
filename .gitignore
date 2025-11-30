@@ -222,3 +222,6 @@ requirements.txt
 # Transformers
 trainer_output/
 trained_models/
+
+# Extra
+cartography_output/
