@@ -5,9 +5,32 @@ from typing import Tuple
 import evaluate
 import numpy as np
 from tqdm.auto import tqdm
-from transformers import EvalPrediction, Trainer
+from transformers import DefaultDataCollator, EvalPrediction, Trainer
 
 QA_MAX_ANSWER_LENGTH = 30
+
+
+class DataCollatorWithExampleId(DefaultDataCollator):
+    """
+    Data collator that handles example_id field separately.
+    Keeps example_id as a list of strings instead of trying to tensorize it.
+    """
+
+    def __call__(self, features, return_tensors=None):
+        # Extract example_ids before collation
+        example_ids = None
+        if features and "example_id" in features[0]:
+            example_ids = [f.pop("example_id") for f in features]
+
+        # Call parent collator for standard fields
+        batch = super().__call__(features, return_tensors)
+
+        # Add example_ids back as a list (not a tensor)
+        if example_ids is not None:
+            batch["example_id"] = example_ids
+
+        return batch
+
 
 FILLER_WORDS = [
     "the",
@@ -407,13 +430,17 @@ class QuestionAnsweringTrainer(Trainer):
         )
 
         if has_cartography and "example_id" in dataset.column_names:
-            # Temporarily add example_id to the model's signature so it won't be removed
-            if self.args.remove_unused_columns:
-                signature_columns = list(self._signature_columns) + ["example_id"]
-                original_signature = self._signature_columns
-                self._signature_columns = signature_columns
+            # Don't remove example_id column when cartography is enabled
+            # We'll handle it in the data collator
+            signature = self._signature_columns or []
+            if "example_id" not in signature:
+                # Save original setting
+                original_remove = self.args.remove_unused_columns
+                # Temporarily disable column removal
+                self.args.remove_unused_columns = False
                 result = super()._remove_unused_columns(dataset, description)
-                self._signature_columns = original_signature
+                # Restore original setting
+                self.args.remove_unused_columns = original_remove
                 return result
 
         return super()._remove_unused_columns(dataset, description)
@@ -424,13 +451,15 @@ class QuestionAnsweringTrainer(Trainer):
         """
         Override compute_loss to track training dynamics for dataset cartography.
         """
+        # Extract example_id before passing to model (model doesn't accept it)
+        example_ids = inputs.pop("example_id", None)
+
         # Get the original loss
         outputs = model(**inputs)
         loss = outputs.loss
 
         # Track training dynamics if cartography is enabled
         # Find cartography callback from registered callbacks
-        # TODO: move imports to the top.
         from dataset_cartography import DatasetCartographyCallback
 
         cartography_callback = None
@@ -439,18 +468,18 @@ class QuestionAnsweringTrainer(Trainer):
                 cartography_callback = callback
                 break
 
-        if cartography_callback is not None and self.args.do_train:
+        if (
+            cartography_callback is not None
+            and self.args.do_train
+            and example_ids is not None
+        ):
             # Extract necessary tensors
             start_logits = outputs.start_logits
             end_logits = outputs.end_logits
             start_positions = inputs.get("start_positions")
             end_positions = inputs.get("end_positions")
 
-            # Get example IDs from the batch
-            # Note: We need to add example_id to the dataset during preprocessing
-            example_ids = inputs.get("example_id")
-
-            if example_ids is not None and start_positions is not None:
+            if start_positions is not None:
                 epoch = int(self.state.epoch) if self.state.epoch is not None else 0
 
                 cartography_callback.record_batch_dynamics(

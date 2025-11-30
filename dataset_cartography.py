@@ -436,7 +436,15 @@ def analyze_cartography_by_question_type(
     Returns:
         DataFrame with metrics grouped by question type
     """
+    # Check if dataset has 'id' column
+    if "id" not in dataset_df.columns:
+        raise ValueError(
+            "dataset_df must have an 'id' column. "
+            "Make sure to generate IDs using generate_hash_ids() if needed."
+        )
+
     # Merge cartography metrics with dataset
+    # Only keep questions for examples we have cartography data for
     merged = cartography_df.join(dataset_df.set_index("id")[["question"]], how="inner")
 
     # Classify question types

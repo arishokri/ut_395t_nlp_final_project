@@ -85,6 +85,16 @@ def main():
         dataset_split = dataset[args.split]
 
     dataset_df = pd.DataFrame(dataset_split)
+
+    # Generate IDs if missing (same as in run.py)
+    if "id" not in dataset_df.columns:
+        print("   Generating IDs for dataset examples...")
+        from helpers import generate_hash_ids
+
+        # Apply hash generation to create IDs
+        dataset_with_ids = dataset_split.map(generate_hash_ids)
+        dataset_df = pd.DataFrame(dataset_with_ids)
+
     print(f"   Loaded {len(dataset_df)} examples from {args.split} split")
 
     # Analyze by question type

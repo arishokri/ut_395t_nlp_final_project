@@ -10,14 +10,15 @@ from transformers import (
     TrainingArguments,
 )
 
+from dataset_cartography import DatasetCartographyCallback
 from helpers import (
+    DataCollatorWithExampleId,
     QuestionAnsweringTrainer,
     compute_metrics,
     generate_hash_ids,
     prepare_train_dataset_qa,
     prepare_validation_dataset_qa,
 )
-from dataset_cartography import DatasetCartographyCallback
 
 NUM_PREPROCESSING_WORKERS = 2
 
@@ -184,12 +185,12 @@ def main():
         cartography_callback = DatasetCartographyCallback(
             output_dir=args.cartography_output_dir
         )
-        print(f"\n{'='*70}")
+        print(f"\n{'=' * 70}")
         print("DATASET CARTOGRAPHY ENABLED")
-        print(f"{'='*70}")
+        print(f"{'=' * 70}")
         print(f"Output directory: {args.cartography_output_dir}")
         print("Training dynamics will be tracked across epochs.")
-        print(f"{'='*70}\n")
+        print(f"{'=' * 70}\n")
 
     # TODO: Why are we doing this?
     # This function wraps the compute_metrics function, storing the model's predictions
@@ -201,6 +202,9 @@ def main():
         eval_predictions = eval_preds
         return compute_metrics(eval_preds)
 
+    # Create data collator that handles example_id for cartography
+    data_collator = DataCollatorWithExampleId() if args.enable_cartography else None
+
     # Initialize the Trainer object with the specified arguments and the model and dataset we loaded above
     trainer = QuestionAnsweringTrainer(
         model=model,
@@ -209,6 +213,7 @@ def main():
         eval_dataset=eval_dataset_featurized,
         processing_class=tokenizer,
         compute_metrics=compute_metrics_and_store_predictions,
+        data_collator=data_collator,
         callbacks=[cartography_callback] if cartography_callback is not None else [],
         **trainer_kwargs,
     )
