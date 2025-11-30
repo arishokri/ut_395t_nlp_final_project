@@ -1,5 +1,6 @@
 import json
 import os
+from functools import partial
 
 import datasets
 from transformers import (
@@ -12,6 +13,7 @@ from transformers import (
 from helpers import (
     QuestionAnsweringTrainer,
     compute_metrics,
+    generate_hash_ids,
     prepare_train_dataset_qa,
     prepare_validation_dataset_qa,
 )
@@ -103,10 +105,9 @@ def main():
         # Load the raw data
         dataset = datasets.load_dataset(*dataset_id)
 
-    # TODO: Is this the correct way of initializing this class?
-    model_class = AutoModelForQuestionAnswering  # Fine-tuning head for QA task.
+    # Fine-tuning head for QA task.
     # Initialize the model and tokenizer from the specified pretrained model/checkpoint
-    model = model_class.from_pretrained(args.model)
+    model = AutoModelForQuestionAnswering.from_pretrained(args.model)
     # Make tensor contiguous if needed https://github.com/huggingface/transformers/issues/28293
     if hasattr(model, "electra"):
         for param in model.electra.parameters():
@@ -115,24 +116,21 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(args.model, use_fast=True)
     ablations = args.ablations
     # Select the dataset preprocessing function (these functions are defined in helpers.py)
-    # TODO: Get rid of these lambda functions and rename the main function to remove qa.
-    prepare_train_dataset = lambda exs: prepare_train_dataset_qa(
-        exs, tokenizer, ablations
+    prepare_train_dataset = partial(
+        prepare_train_dataset_qa, tokenizer=tokenizer, ablations=ablations
     )
-    prepare_eval_dataset = lambda exs: prepare_validation_dataset_qa(exs, tokenizer)
+    prepare_eval_dataset = partial(prepare_validation_dataset_qa, tokenizer=tokenizer)
     print(
         "Preprocessing data... (this takes a little bit, should only happen once per dataset)"
     )
 
     # Dataset-specific preprocessing
-    # TODO: make sure this id is deterministic. Maybe use hashing. Important for Cartography
-    # TODO: exact match for dataset name here.
-    if "emrqa" in dataset_name.lower():
+    if dataset_name.lower() == "eladio/emrqa-msquad":
         # EMR-QA: Add ID column if missing
         for split in dataset.keys():
             if "id" not in dataset[split].column_names:
                 dataset[split] = dataset[split].map(
-                    lambda ex, idx: {"id": str(idx)}, with_indices=True
+                    generate_hash_ids, num_proc=NUM_PREPROCESSING_WORKERS
                 )
 
     train_dataset = None

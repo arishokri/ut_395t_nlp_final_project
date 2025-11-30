@@ -1,4 +1,5 @@
 import collections
+import hashlib
 from typing import Tuple
 
 import evaluate
@@ -31,7 +32,14 @@ FILLER_WORDS = [
 ]
 
 
-# TODO: needs debugging to simplify the logic.
+def generate_hash_ids(example):
+    """Generates a deterministic ID based on hash value if the dataset is missing ID column."""
+    content = f"{example['question']} | {example['context']}"
+    #! If slow, consider using xxhash.xxh64() instead.
+    hash_obj = hashlib.md5(content.encode("utf-8"))
+    return {"id": hash_obj.hexdigest()[:16]}
+
+
 def normalize_answers_for_metrics(example):
     """
     Normalize answers for metric computation based on dataset format.
@@ -104,8 +112,8 @@ def compute_metrics(eval_preds: EvalPrediction):
 # Adapted from https://github.com/huggingface/transformers/blob/master/examples/pytorch/question-answering/run_qa.py
 def prepare_train_dataset_qa(
     examples,
-    tokenizer,
-    ablations: str,
+    tokenizer=None,
+    ablations=None,
     max_seq_length=None,
 ):
     questions = [q.lstrip() for q in examples["question"]]
@@ -225,7 +233,7 @@ def prepare_train_dataset_qa(
 
 def prepare_validation_dataset_qa(
     examples,
-    tokenizer,
+    tokenizer=None,
 ):
     questions = [q.lstrip() for q in examples["question"]]
     contexts = examples["context"]
