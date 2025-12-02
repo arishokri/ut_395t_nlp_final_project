@@ -154,38 +154,21 @@ class DatasetCartographyCallback(TrainerCallback):
         print("\nMetric Statistics:")
         print(df[["confidence", "variability", "correctness"]].describe())
 
-        # Categorize examples (using thresholds from the paper)
-        # Easy: high confidence, low variability
-        # Hard: low confidence, low variability
-        # Ambiguous: low confidence, high variability
-
-        conf_threshold = df["confidence"].median()
-        var_threshold = df["variability"].median()
-
-        easy = df[
-            (df["confidence"] >= conf_threshold) & (df["variability"] <= var_threshold)
-        ]
-        hard = df[
-            (df["confidence"] < conf_threshold) & (df["variability"] <= var_threshold)
-        ]
-        ambiguous = df[
-            (df["confidence"] < conf_threshold) & (df["variability"] > var_threshold)
-        ]
+        # Use categorize_examples to classify examples
+        df_categorized = categorize_examples(df)
+        category_counts = df_categorized["category"].value_counts()
 
         print(f"\n{'=' * 70}")
         print("EXAMPLE CATEGORIZATION (using median thresholds):")
         print(f"{'=' * 70}")
         print(
-            f"Easy to learn (high conf, low var):    {len(easy):6d} ({100 * len(easy) / len(df):5.1f}%)"
+            f"Easy to learn (high conf, low var):    {category_counts.get('easy', 0):6d} ({100 * category_counts.get('easy', 0) / len(df):5.1f}%)"
         )
         print(
-            f"Hard to learn (low conf, low var):     {len(hard):6d} ({100 * len(hard) / len(df):5.1f}%)"
+            f"Hard to learn (low conf, low var):     {category_counts.get('hard', 0):6d} ({100 * category_counts.get('hard', 0) / len(df):5.1f}%)"
         )
         print(
-            f"Ambiguous (low conf, high var):        {len(ambiguous):6d} ({100 * len(ambiguous) / len(df):5.1f}%)"
-        )
-        print(
-            f"Other (high conf, high var):           {len(df) - len(easy) - len(hard) - len(ambiguous):6d}"
+            f"Ambiguous (low conf, high var):        {category_counts.get('ambiguous', 0):6d} ({100 * category_counts.get('ambiguous', 0) / len(df):5.1f}%)"
         )
         print("=" * 70 + "\n")
 
@@ -232,32 +215,18 @@ class DatasetCartographyCallback(TrainerCallback):
         # Plot 2: Distribution of categories
         ax = axes[1]
 
-        conf_threshold = df["confidence"].median()
-        var_threshold = df["variability"].median()
+        # Use categorize_examples to classify examples
+        df_categorized = categorize_examples(df)
+        category_counts = df_categorized["category"].value_counts()
 
-        easy = len(
-            df[
-                (df["confidence"] >= conf_threshold)
-                & (df["variability"] <= var_threshold)
-            ]
-        )
-        hard = len(
-            df[
-                (df["confidence"] < conf_threshold)
-                & (df["variability"] <= var_threshold)
-            ]
-        )
-        ambiguous = len(
-            df[
-                (df["confidence"] < conf_threshold)
-                & (df["variability"] > var_threshold)
-            ]
-        )
-        other = len(df) - easy - hard - ambiguous
+        # Get counts for each category (use .get() for safe access)
+        easy = category_counts.get("easy", 0)
+        hard = category_counts.get("hard", 0)
+        ambiguous = category_counts.get("ambiguous", 0)
 
-        categories = ["Easy", "Hard", "Ambiguous", "Other"]
-        counts = [easy, hard, ambiguous, other]
-        colors = ["green", "red", "orange", "gray"]
+        categories = ["Easy", "Hard", "Ambiguous"]
+        counts = [easy, hard, ambiguous]
+        colors = ["green", "red", "orange"]
 
         bars = ax.bar(categories, counts, color=colors, alpha=0.7)
         ax.set_ylabel("Number of Examples", fontsize=12)
@@ -382,16 +351,23 @@ def categorize_examples(
         var_threshold = df["variability"].median()
 
     def categorize(row):
-        if row["confidence"] >= conf_threshold:
-            if row["variability"] <= var_threshold:
+        if row["variability"] <= var_threshold:
+            if row["confidence"] >= conf_threshold:
                 return "easy"
             else:
-                return "easy_variable"  # high conf, high var
-        else:
-            if row["variability"] <= var_threshold:
                 return "hard"
-            else:
-                return "ambiguous"
+        else:
+            return "ambiguous"
+        # if row["confidence"] >= conf_threshold:
+        #     if row["variability"] <= var_threshold:
+        #         return "easy"
+        #     else:
+        #         return "easy_variable"  # high conf, high var
+        # else:
+        #     if row["variability"] <= var_threshold:
+        #         return "hard"
+        #     else:
+        #         return "ambiguous"
 
     df["category"] = df.apply(categorize, axis=1)
     return df
