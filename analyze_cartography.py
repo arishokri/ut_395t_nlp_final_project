@@ -112,6 +112,7 @@ def main():
     print(f"\n5. Extracting example samples ({args.n_examples} per category)...")
 
     samples = {}
+    samples_files = {}
     for category in ["easy", "hard", "ambiguous"]:
         example_ids = get_examples_by_category(
             cartography_df, category, n=args.n_examples
@@ -131,12 +132,16 @@ def main():
 
         samples[category] = category_examples
         print(f"   - {category:12s}: {len(category_examples)} examples")
+        
+        # Save each category to its own file
+        category_file = os.path.join(args.output_dir, f"{category}_samples.json")
+        with open(category_file, "w") as f:
+            json.dump(category_examples, f, indent=2, default=str)
+        samples_files[category] = category_file
 
-    # Save samples
-    samples_file = os.path.join(args.output_dir, "category_samples.json")
-    with open(samples_file, "w") as f:
-        json.dump(samples, f, indent=2, default=str)
-    print(f"\n   Saved samples to {samples_file}")
+    print(f"\n   Saved category samples to separate files:")
+    for category, filepath in samples_files.items():
+        print(f"   - {category}: {filepath}")
 
     # Create detailed visualizations
     print("\n6. Creating additional visualizations...")
@@ -148,7 +153,6 @@ def main():
     print(f"\nOutputs saved to: {args.output_dir}")
     print(f"- Cartography metrics: {args.cartography_dir}/cartography_metrics.csv")
     print(f"- Question type analysis: {qtype_file}")
-    print(f"- Category samples: {samples_file}")
     print(f"- Visualizations: {args.output_dir}/*.png")
     print("=" * 70 + "\n")
 
