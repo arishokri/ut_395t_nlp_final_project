@@ -11,11 +11,18 @@ dependencies = [
     "ipywidgets>=8.1.8",
     "matplotlib>=3.10.7",
     "nbstripout>=0.8.2",
+    "scikit-learn>=1.6.1",
     "sentence-transformers>=5.1.2",
     "torch>=2.9.0",
     "tqdm>=4.67.1",
     "transformers>=4.57.1",
 ]
+
+[project.optional-dependencies]
+# UMAP requires numba which doesn't support Python 3.14 yet (as of Dec 2024)
+# Use t-SNE or PCA instead, or install in Python 3.10-3.13 environment
+# Track: https://github.com/numba/numba/issues/9776
+clustering-umap = ["umap-learn>=0.5.0"]
 
 [tool.ruff.lint]
 ignore = ["E731"]

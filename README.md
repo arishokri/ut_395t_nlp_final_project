@@ -117,7 +117,7 @@ The callback will generate:
 Use the analysis script to explore your results:
 
 ```bash
-python analyze_cartography.py \
+python analyze_dataset.py \
   --cartography_dir ./cartography_output \
   --split train \
   --n_examples 20 \
@@ -129,6 +129,43 @@ This generates:
 - **Question type analysis**: How different question types behave
 - **Category samples**: Example questions from each category
 - **Additional visualizations**: Distributions, correlations, breakdowns
+
+## Embedding-Based Clustering
+
+Complement cartography with embedding-based clustering to identify semantic regions in your dataset. This helps discover:
+
+- Groups of semantically similar questions
+- Problematic clusters where the model struggles
+- Overlap between semantic similarity and learning difficulty
+
+```bash
+# 1. Extract embeddings from trained model
+python extract_embeddings.py \
+  --model_path ./trainer_output \
+  --output_dir ./embeddings_output \
+  --embedding_types cls question_only
+
+# 2. Cluster embeddings
+python cluster_analysis.py \
+  --embedding_dir ./embeddings_output \
+  --output_dir ./cluster_output \
+  --clustering_method kmeans \
+  --find_optimal
+
+# 3. Integrated analysis (cartography + clustering)
+python analyze_dataset.py \
+  --cartography_dir ./cartography_output \
+  --cluster_dir ./cluster_output \
+  --output_dir ./integrated_analysis
+```
+
+**Notes:**
+
+- Different embedding types (CLS, mean pooling, question-only, context-only)
+- Clustering algorithms (K-means vs DBSCAN)
+- Dimensionality reduction methods (UMAP, t-SNE, PCA)
+- Interpreting integrated results
+- Identifying problematic semantic clusters
 
 ## Version Controlling and Git Practices
 

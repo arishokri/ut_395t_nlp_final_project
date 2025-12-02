@@ -223,8 +223,6 @@ requirements.txt
 trainer_output/
 trained_models/
 
-# Experimental Files/Directories
-test*/
-test*
+# Example Files/Directories
 cartography_output_other/
-
+*example*
