@@ -8,6 +8,27 @@ from tqdm.auto import tqdm
 from transformers import DefaultDataCollator, EvalPrediction, Trainer
 
 QA_MAX_ANSWER_LENGTH = 30
+FILLER_WORDS = [
+    "the",
+    "patient",
+    "may",
+    "have",
+    "no",
+    "significant",
+    "history",
+    "of",
+    "current",
+    "presents",
+    "with",
+    "possible",
+    "likely",
+    "reports",
+    "denies",
+    "for",
+    "and",
+    "or",
+    "is",
+]
 
 
 class DataCollatorWithExampleId(DefaultDataCollator):
@@ -30,29 +51,6 @@ class DataCollatorWithExampleId(DefaultDataCollator):
             batch["example_id"] = example_ids
 
         return batch
-
-
-FILLER_WORDS = [
-    "the",
-    "patient",
-    "may",
-    "have",
-    "no",
-    "significant",
-    "history",
-    "of",
-    "current",
-    "presents",
-    "with",
-    "possible",
-    "likely",
-    "reports",
-    "denies",
-    "for",
-    "and",
-    "or",
-    "is",
-]
 
 
 def generate_hash_ids(example):
@@ -429,6 +427,7 @@ class QuestionAnsweringTrainer(Trainer):
             for cb in self.callback_handler.callbacks
         )
 
+        # TODO: Why are we using "example_id" column? Is this separate from "id"?
         if has_cartography and "example_id" in dataset.column_names:
             # Don't remove example_id column when cartography is enabled
             # We'll handle it in the data collator
