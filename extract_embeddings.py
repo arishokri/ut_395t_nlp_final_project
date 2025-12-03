@@ -112,6 +112,45 @@ class EmbeddingExtractor:
 
         return np.vstack(all_embeddings)
 
+    def _get_base_embeddings(
+        self,
+        texts: List[str],
+        text_pairs: Optional[List[str]] = None,
+        max_length: int = 128,
+        truncation: str = "only_second",
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Extract base embeddings from the model.
+
+        Args:
+            texts: Primary text inputs (questions or contexts)
+            text_pairs: Optional secondary text inputs (contexts when paired with questions)
+            max_length: Maximum sequence length
+            truncation: Truncation strategy
+
+        Returns:
+            Tuple of (hidden_states, attention_mask)
+            - hidden_states: tensor of shape (batch_size, seq_len, hidden_dim)
+            - attention_mask: tensor of shape (batch_size, seq_len)
+        """
+        inputs = self.tokenizer(
+            texts,
+            text_pairs,
+            truncation=truncation if text_pairs else True,
+            max_length=max_length,
+            padding="max_length",
+            return_tensors="pt",
+        )
+        inputs = {k: v.to(self.device) for k, v in inputs.items()}
+
+        # Get embeddings from base model
+        if hasattr(self.model, "electra"):
+            outputs = self.model.electra(**inputs)
+        else:
+            outputs = self.model.base_model(**inputs)
+
+        return outputs.last_hidden_state, inputs["attention_mask"]
+
     def _extract_combined_embeddings(
         self,
         questions: List[str],
@@ -120,34 +159,16 @@ class EmbeddingExtractor:
         embedding_type: str,
     ) -> np.ndarray:
         """Extract embeddings from question-context pairs."""
-        # Tokenize question-context pairs
-        inputs = self.tokenizer(
-            questions,
-            contexts,
-            truncation="only_second",
-            max_length=max_length,
-            padding="max_length",
-            return_tensors="pt",
+        hidden_states, attention_mask = self._get_base_embeddings(
+            questions, contexts, max_length, truncation="only_second"
         )
-        inputs = {k: v.to(self.device) for k, v in inputs.items()}
-
-        # Get model outputs
-        # For ELECTRA QA model, we need to access the base model's outputs
-        if hasattr(self.model, "electra"):
-            outputs = self.model.electra(**inputs)
-        else:
-            # Fallback for other model architectures
-            outputs = self.model.base_model(**inputs)
-
-        # Extract embeddings based on type
-        hidden_states = outputs.last_hidden_state  # (batch_size, seq_len, hidden_dim)
 
         if embedding_type == "cls":
             # Use [CLS] token (first token)
             embeddings = hidden_states[:, 0, :].cpu().numpy()
         elif embedding_type == "mean":
             # Mean pooling over all tokens (excluding padding)
-            attention_mask = inputs["attention_mask"].unsqueeze(-1)
+            attention_mask = attention_mask.unsqueeze(-1)
             masked_embeddings = hidden_states * attention_mask
             sum_embeddings = masked_embeddings.sum(dim=1)
             sum_mask = attention_mask.sum(dim=1)
@@ -161,49 +182,15 @@ class EmbeddingExtractor:
         self, questions: List[str], max_length: int
     ) -> np.ndarray:
         """Extract embeddings from questions only."""
-        # Tokenize questions only
-        inputs = self.tokenizer(
-            questions,
-            truncation=True,
-            max_length=max_length,
-            padding="max_length",
-            return_tensors="pt",
-        )
-        inputs = {k: v.to(self.device) for k, v in inputs.items()}
-
-        # Get embeddings from base model
-        if hasattr(self.model, "electra"):
-            outputs = self.model.electra(**inputs)
-        else:
-            outputs = self.model.base_model(**inputs)
-
-        # Use [CLS] token
-        embeddings = outputs.last_hidden_state[:, 0, :].cpu().numpy()
-        return embeddings
+        hidden_states, _ = self._get_base_embeddings(questions, None, max_length)
+        return hidden_states[:, 0, :].cpu().numpy()
 
     def _extract_context_embeddings(
         self, contexts: List[str], max_length: int
     ) -> np.ndarray:
         """Extract embeddings from contexts only."""
-        # Tokenize contexts only
-        inputs = self.tokenizer(
-            contexts,
-            truncation=True,
-            max_length=max_length,
-            padding="max_length",
-            return_tensors="pt",
-        )
-        inputs = {k: v.to(self.device) for k, v in inputs.items()}
-
-        # Get embeddings from base model
-        if hasattr(self.model, "electra"):
-            outputs = self.model.electra(**inputs)
-        else:
-            outputs = self.model.base_model(**inputs)
-
-        # Use [CLS] token
-        embeddings = outputs.last_hidden_state[:, 0, :].cpu().numpy()
-        return embeddings
+        hidden_states, _ = self._get_base_embeddings(contexts, None, max_length)
+        return hidden_states[:, 0, :].cpu().numpy()
 
 
 def extract_and_save_embeddings(

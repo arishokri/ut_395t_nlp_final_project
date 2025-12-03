@@ -14,20 +14,12 @@ import datasets
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import umap
 from sklearn.cluster import DBSCAN, KMeans
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import StandardScaler
-
-try:
-    import umap
-
-    UMAP_AVAILABLE = True
-except ImportError:
-    UMAP_AVAILABLE = False
-    # Note: UMAP requires numba which doesn't support Python 3.14 yet (as of Dec 2024)
-    # Using t-SNE or PCA instead is recommended
 
 from extract_embeddings import load_embeddings
 from helpers import generate_hash_ids
@@ -631,9 +623,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--reduction_method",
         type=str,
-        default="tsne",
+        default="umap",
         choices=["pca", "tsne", "umap"],
-        help="Dimensionality reduction method (default: tsne; umap requires Python <=3.13)",
+        help="Dimensionality reduction method",
     )
     parser.add_argument(
         "--find_optimal",

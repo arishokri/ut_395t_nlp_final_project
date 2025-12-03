@@ -117,7 +117,7 @@ The callback will generate:
 Use the analysis script to explore your results:
 
 ```bash
-python analyze_dataset.py \
+python analyze_cartography.py \
   --cartography_dir ./cartography_output \
   --split train \
   --n_examples 20 \

@@ -84,7 +84,7 @@ python cluster_analysis.py \
   --embedding_type cls \
   --clustering_method kmeans \
   --find_optimal \
-  --reduction_method tsne
+  --reduction_method umap
 
 echo "✓ K-means clustering complete"
 echo ""
