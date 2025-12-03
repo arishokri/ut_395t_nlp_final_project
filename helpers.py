@@ -141,7 +141,8 @@ def prepare_train_dataset_qa(
     contexts = examples["context"]
     normalized_answers = examples["answers"]
     example_ids = examples.get("id", [None] * len(questions))  # Get example IDs
-    max_seq_length = tokenizer.model_max_length
+    if max_seq_length is None:
+        max_seq_length = tokenizer.model_max_length
 
     # If passage-only, destroy question content
     if ablations == "p_only":

@@ -58,7 +58,7 @@ def main():
     argp.add_argument(
         "--max_length",
         type=int,
-        default=128,
+        default=512,
         help="""This argument limits the maximum sequence length used during training/evaluation.
         Shorter sequence lengths need less memory and computation time, but some examples may end up getting truncated.""",
     )
