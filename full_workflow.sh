@@ -51,73 +51,55 @@ echo ""
 # STEP 2: Extract embeddings from trained model
 # =============================================================================
 echo "=========================================================================="
-echo "STEP 2: Extracting embeddings from trained model"
+echo "STEP 2: Extracting [CLS + answer span] embeddings from trained model"
 echo "=========================================================================="
 
-# Extract both CLS and question-only embeddings for comparison
 python extract_embeddings.py \
   --model_path "$MODEL_DIR" \
   --dataset Eladio/emrqa-msquad \
   --output_dir "$EMB_DIR" \
   --split train \
   --max_samples "$MAX_SAMPLES" \
-  --batch_size 32 \
-  --embedding_types cls question_only
+  --batch_size 32
 
 echo "✓ Embeddings extracted successfully"
 echo ""
 
 # =============================================================================
-# STEP 3: Perform clustering analysis
+# STEP 3: Perform clustering analysis with HDBSCAN
 # =============================================================================
 echo "=========================================================================="
-echo "STEP 3: Clustering embeddings"
+echo "STEP 3: HDBSCAN Clustering (PCA → HDBSCAN → UMAP visualization)"
 echo "=========================================================================="
 
-# Try K-means with automatic optimal k detection
-echo "3a. K-means clustering with optimal k detection..."
+# HDBSCAN with 50D PCA reduction
+echo "3a. HDBSCAN clustering with 50D PCA reduction..."
 python cluster_analysis.py \
   --embedding_dir "$EMB_DIR" \
-  --output_dir "${CLUSTER_DIR}_kmeans" \
+  --output_dir "${CLUSTER_DIR}_50d" \
   --dataset Eladio/emrqa-msquad \
   --split train \
-  --embedding_type cls \
-  --clustering_method kmeans \
-  --find_optimal \
-  --reduction_method umap
+  --reduction_dim 50 \
+  --reduction_method pca \
+  --min_cluster_size 15 \
+  --visualization_method umap
 
-echo "✓ K-means clustering complete"
+echo "✓ 50D clustering complete"
 echo ""
 
-# Also try DBSCAN to find outliers
-echo "3b. DBSCAN clustering for outlier detection..."
+# Try different reduction dimensions
+echo "3b. HDBSCAN with 30D PCA (more conservative)..."
 python cluster_analysis.py \
   --embedding_dir "$EMB_DIR" \
-  --output_dir "${CLUSTER_DIR}_dbscan" \
+  --output_dir "${CLUSTER_DIR}_30d" \
   --dataset Eladio/emrqa-msquad \
   --split train \
-  --embedding_type cls \
-  --clustering_method dbscan \
-  --dbscan_eps 0.4 \
-  --dbscan_min_samples 15 \
-  --reduction_method umap
+  --reduction_dim 30 \
+  --reduction_method pca \
+  --min_cluster_size 15 \
+  --visualization_method umap
 
-echo "✓ DBSCAN clustering complete"
-echo ""
-
-# Try question-only embeddings
-echo "3c. Question-only embeddings clustering..."
-python cluster_analysis.py \
-  --embedding_dir "$EMB_DIR" \
-  --output_dir "${CLUSTER_DIR}_question_only" \
-  --dataset Eladio/emrqa-msquad \
-  --split train \
-  --embedding_type question_only \
-  --clustering_method kmeans \
-  --n_clusters 10 \
-  --reduction_method umap
-
-echo "✓ Question-only clustering complete"
+echo "✓ 30D clustering complete"
 echo ""
 
 # =============================================================================
@@ -127,40 +109,28 @@ echo "==========================================================================
 echo "STEP 4: Integrated cartography + clustering analysis"
 echo "=========================================================================="
 
-# Analyze K-means results with cartography
-echo "4a. Analyzing K-means + cartography..."
+# Analyze 50D results with cartography
+echo "4a. Analyzing 50D clustering + cartography..."
 python analyze_dataset.py \
   --cartography_dir "$CART_DIR" \
-  --cluster_dir "${CLUSTER_DIR}_kmeans" \
+  --cluster_dir "${CLUSTER_DIR}_50d" \
   --dataset Eladio/emrqa-msquad \
   --split train \
-  --output_dir "${ANALYSIS_DIR}_kmeans"
+  --output_dir "${ANALYSIS_DIR}_50d"
 
-echo "✓ K-means analysis complete"
+echo "✓ 50D analysis complete"
 echo ""
 
-# Analyze DBSCAN results with cartography
-echo "4b. Analyzing DBSCAN + cartography..."
+# Analyze 30D results with cartography
+echo "4b. Analyzing 30D clustering + cartography..."
 python analyze_dataset.py \
   --cartography_dir "$CART_DIR" \
-  --cluster_dir "${CLUSTER_DIR}_dbscan" \
+  --cluster_dir "${CLUSTER_DIR}_30d" \
   --dataset Eladio/emrqa-msquad \
   --split train \
-  --output_dir "${ANALYSIS_DIR}_dbscan"
+  --output_dir "${ANALYSIS_DIR}_30d"
 
-echo "✓ DBSCAN analysis complete"
-echo ""
-
-# Analyze question-only clustering
-echo "4c. Analyzing question-only clustering + cartography..."
-python analyze_dataset.py \
-  --cartography_dir "$CART_DIR" \
-  --cluster_dir "${CLUSTER_DIR}_question_only" \
-  --dataset Eladio/emrqa-msquad \
-  --split train \
-  --output_dir "${ANALYSIS_DIR}_question_only"
-
-echo "✓ Question-only analysis complete"
+echo "✓ 30D analysis complete"
 echo ""
 
 # =============================================================================
@@ -177,20 +147,17 @@ echo "  └─ Cartography metrics: $CART_DIR/"
 echo ""
 
 echo "Embeddings:"
-echo "  ├─ CLS embeddings: ${EMB_DIR}/embeddings_cls.npy"
-echo "  └─ Question-only: ${EMB_DIR}/embeddings_question_only.npy"
+echo "  └─ [CLS + answer span]: ${EMB_DIR}/embeddings.npy"
 echo ""
 
 echo "Clustering Results:"
-echo "  ├─ K-means: ${CLUSTER_DIR}_kmeans/"
-echo "  ├─ DBSCAN: ${CLUSTER_DIR}_dbscan/"
-echo "  └─ Question-only: ${CLUSTER_DIR}_question_only/"
+echo "  ├─ 50D: ${CLUSTER_DIR}_50d/"
+echo "  └─ 30D: ${CLUSTER_DIR}_30d/"
 echo ""
 
 echo "Integrated Analysis:"
-echo "  ├─ K-means analysis: ${ANALYSIS_DIR}_kmeans/"
-echo "  ├─ DBSCAN analysis: ${ANALYSIS_DIR}_dbscan/"
-echo "  └─ Question-only: ${ANALYSIS_DIR}_question_only/"
+echo "  ├─ 50D analysis: ${ANALYSIS_DIR}_50d/"
+echo "  └─ 30D analysis: ${ANALYSIS_DIR}_30d/"
 echo ""
 
 echo "=========================================================================="
@@ -198,21 +165,23 @@ echo "KEY FILES TO EXAMINE:"
 echo "=========================================================================="
 echo ""
 echo "1. START HERE - Most problematic clusters:"
-echo "   ${ANALYSIS_DIR}_kmeans/interesting_patterns.json"
+echo "   ${ANALYSIS_DIR}_50d/interesting_patterns.json"
 echo ""
 echo "2. Category-cluster overlap:"
-echo "   ${ANALYSIS_DIR}_kmeans/category_cluster_overlap.csv"
+echo "   ${ANALYSIS_DIR}_50d/category_cluster_overlap.csv"
 echo ""
-echo "3. Cluster statistics:"
-echo "   ${CLUSTER_DIR}_kmeans/cluster_statistics.csv"
+echo "3. Cluster statistics (with HDBSCAN persistence):"
+echo "   ${CLUSTER_DIR}_50d/cluster_statistics.csv"
 echo ""
 echo "4. Example questions per cluster:"
-echo "   ${CLUSTER_DIR}_kmeans/cluster_samples.json"
+echo "   ${CLUSTER_DIR}_50d/cluster_samples.json"
 echo ""
 echo "5. Visualizations:"
-echo "   ${ANALYSIS_DIR}_kmeans/integrated_scatter.png"
-echo "   ${ANALYSIS_DIR}_kmeans/category_cluster_heatmap.png"
-echo "   ${CLUSTER_DIR}_kmeans/cluster_visualization.png"
+echo "   ${ANALYSIS_DIR}_50d/integrated_scatter.png"
+echo "   ${ANALYSIS_DIR}_50d/category_cluster_heatmap.png"
+echo "   ${CLUSTER_DIR}_50d/cluster_visualization.png"
+echo "   ${CLUSTER_DIR}_50d/cluster_persistence.png (HDBSCAN stability)"
+echo "   ${CLUSTER_DIR}_50d/cluster_probabilities.png"
 echo ""
 
 echo "=========================================================================="
@@ -221,13 +190,16 @@ echo "==========================================================================
 echo ""
 echo "1. Review interesting_patterns.json to identify problematic clusters"
 echo "2. Examine cluster_samples.json to understand what makes each cluster unique"
-echo "3. Compare K-means vs DBSCAN results"
-echo "4. Compare full embeddings vs question-only embeddings"
-echo "5. Use findings to:"
+echo "3. Check cluster persistence scores (higher = more stable clusters)"
+echo "4. Examine cluster probabilities to find uncertain examples"
+echo "5. Compare 50D vs 30D results to find optimal dimensionality"
+echo "6. Compare full embeddings vs question-only embeddings"
+echo "7. Use findings to:"
 echo "   - Identify data augmentation needs"
 echo "   - Find annotation inconsistencies"
 echo "   - Understand model's failure modes"
 echo "   - Guide targeted improvements"
+echo "   - Focus on low-probability cluster members (potential outliers)"
 echo ""
 echo "=========================================================================="
 
@@ -236,15 +208,15 @@ echo "Quick Statistics:"
 echo "=========================================================================="
 echo ""
 
-if [ -f "${ANALYSIS_DIR}_kmeans/interesting_patterns.json" ]; then
-    echo "Most problematic clusters (K-means):"
-    cat "${ANALYSIS_DIR}_kmeans/interesting_patterns.json" | python -m json.tool | grep -A 5 "most_problematic_clusters"
+if [ -f "${ANALYSIS_DIR}_50d/interesting_patterns.json" ]; then
+    echo "Most problematic clusters (50D):"
+    cat "${ANALYSIS_DIR}_50d/interesting_patterns.json" | python -m json.tool | grep -A 5 "most_problematic_clusters"
     echo ""
 fi
 
-if [ -f "${CLUSTER_DIR}_kmeans/cluster_statistics.csv" ]; then
-    echo "Cluster sizes (K-means):"
-    head -n 11 "${CLUSTER_DIR}_kmeans/cluster_statistics.csv" | column -t -s,
+if [ -f "${CLUSTER_DIR}_50d/cluster_statistics.csv" ]; then
+    echo "Cluster sizes and persistence (50D):"
+    head -n 11 "${CLUSTER_DIR}_50d/cluster_statistics.csv" | column -t -s,
     echo ""
 fi
 

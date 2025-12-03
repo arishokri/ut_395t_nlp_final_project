@@ -3,6 +3,14 @@ Embedding Extraction Module for Dataset Analysis
 
 This module extracts embeddings from ELECTRA model representations
 to enable clustering and semantic analysis of QA examples.
+
+Embedding Design:
+    Representation = [CLS of (Q, context)] + mean-pooled answer span tokens
+
+    Why this design?
+    - [CLS] gives a global representation of Q+context
+    - The pooled span gives a local representation of what was actually labeled as answer
+    - Together they capture both global semantic context and local answer alignment
 """
 
 import json
@@ -20,11 +28,11 @@ class EmbeddingExtractor:
     """
     Extracts embeddings from ELECTRA-based QA models.
 
-    Supports extraction of:
-    - [CLS] token embeddings from final layer
-    - Question-only embeddings
-    - Context-only embeddings
-    - Combined question-context embeddings
+    Creates embeddings by concatenating:
+    1. [CLS] token from (question, context) encoding
+    2. Mean-pooled answer span tokens
+
+    This captures both global semantic context and local answer representation.
     """
 
     def __init__(
@@ -53,35 +61,43 @@ class EmbeddingExtractor:
 
         print(f"Model loaded on {self.device}")
 
+        # Get embedding dimension from model
+        if hasattr(self.model, "electra"):
+            self.hidden_size = self.model.electra.config.hidden_size
+        else:
+            self.hidden_size = self.model.config.hidden_size
+
+        print(f"Hidden size: {self.hidden_size}")
+        print(f"Output embedding dimension: {self.hidden_size * 2} ([CLS] + span)")
+
     def extract_embeddings(
         self,
         questions: List[str],
         contexts: List[str],
+        answers: List[Dict[str, any]],
         batch_size: int = 32,
-        max_length: int = 128,
-        embedding_type: str = "cls",
+        max_length: int = 384,
         show_progress: bool = True,
     ) -> np.ndarray:
         """
-        Extract embeddings for a list of question-context pairs.
+        Extract embeddings for question-context-answer triplets.
 
         Args:
             questions: List of questions
             contexts: List of contexts
+            answers: List of answer dicts with 'text' and 'answer_start' keys
             batch_size: Batch size for processing
             max_length: Maximum sequence length
-            embedding_type: Type of embedding to extract:
-                - 'cls': [CLS] token from final layer
-                - 'mean': Mean pooling over all tokens
-                - 'question_only': [CLS] from question-only input
-                - 'context_only': [CLS] from context-only input
             show_progress: Whether to show progress bar
 
         Returns:
-            numpy array of shape (n_examples, embedding_dim)
+            numpy array of shape (n_examples, hidden_size * 2)
+            Each embedding is [CLS vector (hidden_size) + mean-pooled span (hidden_size)]
         """
-        if len(questions) != len(contexts):
-            raise ValueError("Questions and contexts must have the same length")
+        if not (len(questions) == len(contexts) == len(answers)):
+            raise ValueError(
+                "Questions, contexts, and answers must have the same length"
+            )
 
         all_embeddings = []
         n_batches = (len(questions) + batch_size - 1) // batch_size
@@ -94,103 +110,101 @@ class EmbeddingExtractor:
             for i in iterator:
                 batch_questions = questions[i : i + batch_size]
                 batch_contexts = contexts[i : i + batch_size]
+                batch_answers = answers[i : i + batch_size]
 
-                if embedding_type == "question_only":
-                    embeddings = self._extract_question_embeddings(
-                        batch_questions, max_length
-                    )
-                elif embedding_type == "context_only":
-                    embeddings = self._extract_context_embeddings(
-                        batch_contexts, max_length
-                    )
-                else:
-                    embeddings = self._extract_combined_embeddings(
-                        batch_questions, batch_contexts, max_length, embedding_type
-                    )
-
+                embeddings = self._extract_batch_embeddings(
+                    batch_questions, batch_contexts, batch_answers, max_length
+                )
                 all_embeddings.append(embeddings)
 
         return np.vstack(all_embeddings)
 
-    def _get_base_embeddings(
+    def _extract_batch_embeddings(
         self,
-        texts: List[str],
-        text_pairs: Optional[List[str]] = None,
-        max_length: int = 128,
-        truncation: str = "only_second",
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        questions: List[str],
+        contexts: List[str],
+        answers: List[Dict[str, any]],
+        max_length: int,
+    ) -> np.ndarray:
         """
-        Extract base embeddings from the model.
-
-        Args:
-            texts: Primary text inputs (questions or contexts)
-            text_pairs: Optional secondary text inputs (contexts when paired with questions)
-            max_length: Maximum sequence length
-            truncation: Truncation strategy
+        Extract embeddings for a batch.
 
         Returns:
-            Tuple of (hidden_states, attention_mask)
-            - hidden_states: tensor of shape (batch_size, seq_len, hidden_dim)
-            - attention_mask: tensor of shape (batch_size, seq_len)
+            numpy array of shape (batch_size, hidden_size * 2)
         """
+        # Tokenize with offsets to track answer span positions
         inputs = self.tokenizer(
-            texts,
-            text_pairs,
-            truncation=truncation if text_pairs else True,
+            questions,
+            contexts,
+            truncation="only_second",
             max_length=max_length,
             padding="max_length",
             return_tensors="pt",
+            return_offsets_mapping=True,
         )
+
+        offset_mapping = inputs.pop("offset_mapping")
         inputs = {k: v.to(self.device) for k, v in inputs.items()}
 
-        # Get embeddings from base model
+        # Get hidden states from ELECTRA
         if hasattr(self.model, "electra"):
             outputs = self.model.electra(**inputs)
         else:
             outputs = self.model.base_model(**inputs)
 
-        return outputs.last_hidden_state, inputs["attention_mask"]
+        hidden_states = outputs.last_hidden_state  # (batch_size, seq_len, hidden_size)
 
-    def _extract_combined_embeddings(
-        self,
-        questions: List[str],
-        contexts: List[str],
-        max_length: int,
-        embedding_type: str,
-    ) -> np.ndarray:
-        """Extract embeddings from question-context pairs."""
-        hidden_states, attention_mask = self._get_base_embeddings(
-            questions, contexts, max_length, truncation="only_second"
-        )
+        # Extract embeddings for each example in batch
+        batch_embeddings = []
+        for idx in range(len(questions)):
+            # 1. Extract [CLS] token (first token)
+            cls_embedding = hidden_states[idx, 0, :].cpu().numpy()  # (hidden_size,)
 
-        if embedding_type == "cls":
-            # Use [CLS] token (first token)
-            embeddings = hidden_states[:, 0, :].cpu().numpy()
-        elif embedding_type == "mean":
-            # Mean pooling over all tokens (excluding padding)
-            attention_mask = attention_mask.unsqueeze(-1)
-            masked_embeddings = hidden_states * attention_mask
-            sum_embeddings = masked_embeddings.sum(dim=1)
-            sum_mask = attention_mask.sum(dim=1)
-            embeddings = (sum_embeddings / sum_mask).cpu().numpy()
-        else:
-            raise ValueError(f"Unknown embedding type: {embedding_type}")
+            # 2. Find answer span tokens and mean-pool them
+            answer_text = (
+                answers[idx]["text"]
+                if isinstance(answers[idx], dict)
+                else answers[idx]["text"][0]
+            )
+            answer_start = (
+                answers[idx]["answer_start"]
+                if isinstance(answers[idx], dict)
+                else answers[idx]["answer_start"][0]
+            )
+            answer_end = answer_start + len(answer_text)
 
-        return embeddings
+            # Find token positions that overlap with answer span
+            span_token_ids = []
+            for token_idx, (start, end) in enumerate(offset_mapping[idx]):
+                # Skip special tokens (offset is (0, 0))
+                if start == 0 and end == 0:
+                    continue
 
-    def _extract_question_embeddings(
-        self, questions: List[str], max_length: int
-    ) -> np.ndarray:
-        """Extract embeddings from questions only."""
-        hidden_states, _ = self._get_base_embeddings(questions, None, max_length)
-        return hidden_states[:, 0, :].cpu().numpy()
+                # Check if token overlaps with answer span
+                # Note: offsets are relative to the context, need to account for question
+                if start < answer_end and end > answer_start:
+                    span_token_ids.append(token_idx)
 
-    def _extract_context_embeddings(
-        self, contexts: List[str], max_length: int
-    ) -> np.ndarray:
-        """Extract embeddings from contexts only."""
-        hidden_states, _ = self._get_base_embeddings(contexts, None, max_length)
-        return hidden_states[:, 0, :].cpu().numpy()
+            # Mean-pool span tokens
+            if span_token_ids:
+                span_embeddings = hidden_states[
+                    idx, span_token_ids, :
+                ]  # (n_span_tokens, hidden_size)
+                span_embedding = (
+                    span_embeddings.mean(dim=0).cpu().numpy()
+                )  # (hidden_size,)
+            else:
+                # Fallback: if no tokens found (shouldn't happen), use zero vector
+                span_embedding = np.zeros(self.hidden_size, dtype=np.float32)
+                print(f"Warning: No span tokens found for answer '{answer_text}'")
+
+            # 3. Concatenate [CLS] + span
+            combined_embedding = np.concatenate(
+                [cls_embedding, span_embedding]
+            )  # (hidden_size * 2,)
+            batch_embeddings.append(combined_embedding)
+
+        return np.array(batch_embeddings)
 
 
 def extract_and_save_embeddings(
@@ -200,8 +214,7 @@ def extract_and_save_embeddings(
     split: str = "train",
     max_samples: Optional[int] = None,
     batch_size: int = 32,
-    embedding_types: List[str] = ["cls"],
-    max_length: int = 128,
+    max_length: int = 384,
 ):
     """
     Extract embeddings for a dataset and save to disk.
@@ -213,10 +226,20 @@ def extract_and_save_embeddings(
         split: Dataset split to use
         max_samples: Maximum number of samples to process
         batch_size: Batch size for extraction
-        embedding_types: Types of embeddings to extract
         max_length: Maximum sequence length
     """
     os.makedirs(output_dir, exist_ok=True)
+
+    print("=" * 70)
+    print("EMBEDDING EXTRACTION")
+    print("=" * 70)
+    print(f"\nModel: {model_path}")
+    print(f"Dataset: {dataset_name}")
+    print(f"Split: {split}")
+    print(f"Max samples: {max_samples or 'all'}")
+    print(f"Batch size: {batch_size}")
+    print(f"Max length: {max_length}")
+    print()
 
     print(f"Loading dataset: {dataset_name}")
     if dataset_name.endswith(".json") or dataset_name.endswith(".jsonl"):
@@ -229,32 +252,35 @@ def extract_and_save_embeddings(
     if max_samples:
         data_split = data_split.select(range(min(max_samples, len(data_split))))
 
-    print(f"Processing {len(data_split)} examples")
+    print(f"Processing {len(data_split)} examples\n")
 
     # Extract data
     questions = data_split["question"]
     contexts = data_split["context"]
+    answers = data_split["answers"]
     example_ids = data_split["id"] if "id" in data_split.column_names else None
 
     # Initialize extractor
     extractor = EmbeddingExtractor(model_path)
 
-    # Extract and save each embedding type
-    for emb_type in embedding_types:
-        print(f"\nExtracting {emb_type} embeddings...")
-        embeddings = extractor.extract_embeddings(
-            questions=questions,
-            contexts=contexts,
-            batch_size=batch_size,
-            max_length=max_length,
-            embedding_type=emb_type,
-        )
+    # Extract embeddings
+    print("\nExtracting [CLS + answer span] embeddings...")
+    embeddings = extractor.extract_embeddings(
+        questions=questions,
+        contexts=contexts,
+        answers=answers,
+        batch_size=batch_size,
+        max_length=max_length,
+    )
 
-        # Save embeddings
-        output_file = os.path.join(output_dir, f"embeddings_{emb_type}.npy")
-        np.save(output_file, embeddings)
-        print(f"Saved {emb_type} embeddings to {output_file}")
-        print(f"Shape: {embeddings.shape}")
+    # Save embeddings
+    output_file = os.path.join(output_dir, "embeddings.npy")
+    np.save(output_file, embeddings)
+    print(f"\n✓ Saved embeddings to {output_file}")
+    print(f"  Shape: {embeddings.shape}")
+    print(
+        f"  Embedding dimension: {embeddings.shape[1]} ([CLS]:{extractor.hidden_size} + span:{extractor.hidden_size})"
+    )
 
     # Save metadata
     metadata = {
@@ -262,9 +288,10 @@ def extract_and_save_embeddings(
         "dataset_name": dataset_name,
         "split": split,
         "n_examples": len(data_split),
-        "embedding_types": embedding_types,
         "max_length": max_length,
         "embedding_dim": embeddings.shape[1],
+        "hidden_size": extractor.hidden_size,
+        "embedding_composition": "[CLS of (Q, context)] + mean-pooled answer span",
     }
 
     if example_ids:
@@ -274,24 +301,23 @@ def extract_and_save_embeddings(
     with open(metadata_file, "w") as f:
         json.dump(metadata, f, indent=2)
 
-    print(f"\nSaved metadata to {metadata_file}")
-    print("=" * 70)
+    print(f"✓ Saved metadata to {metadata_file}")
+    print("\n" + "=" * 70)
+    print("EMBEDDING EXTRACTION COMPLETE")
+    print("=" * 70 + "\n")
 
 
-def load_embeddings(
-    embedding_dir: str, embedding_type: str = "cls"
-) -> Tuple[np.ndarray, Dict]:
+def load_embeddings(embedding_dir: str) -> Tuple[np.ndarray, Dict]:
     """
     Load embeddings from disk.
 
     Args:
         embedding_dir: Directory containing saved embeddings
-        embedding_type: Type of embedding to load
 
     Returns:
         Tuple of (embeddings array, metadata dict)
     """
-    embedding_file = os.path.join(embedding_dir, f"embeddings_{embedding_type}.npy")
+    embedding_file = os.path.join(embedding_dir, "embeddings.npy")
     metadata_file = os.path.join(embedding_dir, "embeddings_metadata.json")
 
     if not os.path.exists(embedding_file):
@@ -310,7 +336,9 @@ def load_embeddings(
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="Extract embeddings from QA model")
+    parser = argparse.ArgumentParser(
+        description="Extract [CLS + answer span] embeddings from QA model"
+    )
     parser.add_argument(
         "--model_path",
         type=str,
@@ -348,17 +376,9 @@ if __name__ == "__main__":
         help="Batch size for extraction",
     )
     parser.add_argument(
-        "--embedding_types",
-        type=str,
-        nargs="+",
-        default=["cls"],
-        choices=["cls", "mean", "question_only", "context_only"],
-        help="Types of embeddings to extract",
-    )
-    parser.add_argument(
         "--max_length",
         type=int,
-        default=128,
+        default=384,
         help="Maximum sequence length",
     )
 
@@ -371,6 +391,5 @@ if __name__ == "__main__":
         split=args.split,
         max_samples=args.max_samples,
         batch_size=args.batch_size,
-        embedding_types=args.embedding_types,
         max_length=args.max_length,
     )

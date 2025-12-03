@@ -2,23 +2,27 @@
 Clustering Analysis for QA Dataset Embeddings
 
 This module performs clustering on dataset embeddings to identify
-semantic regions and patterns in the data.
+semantic regions and patterns in the data using HDBSCAN.
+
+Pipeline:
+1. Normalize embeddings
+2. Reduce to intermediate dimensions (30-50) using PCA
+3. Cluster using HDBSCAN (Hierarchical DBSCAN)
+4. Further reduce to 2D for visualization
 """
 
 import argparse
 import json
 import os
-from typing import Optional, Tuple
+from typing import Optional
 
 import datasets
+import hdbscan
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import umap
-from sklearn.cluster import DBSCAN, KMeans
 from sklearn.decomposition import PCA
-from sklearn.manifold import TSNE
-from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import StandardScaler
 
 from extract_embeddings import load_embeddings
@@ -27,13 +31,13 @@ from helpers import generate_hash_ids
 
 class ClusterAnalyzer:
     """
-    Performs clustering analysis on embeddings.
+    Performs clustering analysis on embeddings using HDBSCAN.
 
-    Supports:
-    - Multiple clustering algorithms (K-means, DBSCAN)
-    - Dimensionality reduction (PCA, t-SNE, UMAP)
-    - Cluster quality metrics
-    - Visualization
+    Pipeline:
+    1. Normalize embeddings
+    2. Reduce to intermediate dimensions (30-50) using PCA
+    3. Cluster using HDBSCAN
+    4. Reduce to 2D for visualization using UMAP
     """
 
     def __init__(
@@ -60,190 +64,162 @@ class ClusterAnalyzer:
             self.scaler = None
             self.embeddings_normalized = embeddings
 
+        self.embeddings_reduced = None
         self.cluster_labels = None
-        self.cluster_method = None
-        self.cluster_params = None
+        self.clusterer = None
+        self.reduction_dim = None
 
-    def cluster_kmeans(
+    def reduce_for_clustering(
         self,
-        n_clusters: int = 10,
+        n_components: int = 50,
+        method: str = "pca",
         random_state: int = 42,
         **kwargs,
     ) -> np.ndarray:
         """
-        Perform K-means clustering.
+        Reduce dimensionality before clustering.
 
         Args:
-            n_clusters: Number of clusters
-            random_state: Random seed
-            **kwargs: Additional arguments for KMeans
-
-        Returns:
-            Array of cluster labels
-        """
-        print(f"\nPerforming K-means clustering with {n_clusters} clusters...")
-
-        kmeans = KMeans(
-            n_clusters=n_clusters,
-            random_state=random_state,
-            n_init=10,
-            **kwargs,
-        )
-
-        self.cluster_labels = kmeans.fit_predict(self.embeddings_normalized)
-        self.cluster_method = "kmeans"
-        self.cluster_params = {"n_clusters": n_clusters, "random_state": random_state}
-
-        # Compute metrics
-        silhouette = silhouette_score(self.embeddings_normalized, self.cluster_labels)
-
-        print("Clustering complete!")
-        print(f"Silhouette score: {silhouette:.3f}")
-        print(f"Cluster sizes: {np.bincount(self.cluster_labels)}")
-
-        return self.cluster_labels
-
-    def cluster_dbscan(
-        self,
-        eps: float = 0.5,
-        min_samples: int = 5,
-        **kwargs,
-    ) -> np.ndarray:
-        """
-        Perform DBSCAN clustering.
-
-        Args:
-            eps: Maximum distance between samples in a neighborhood
-            min_samples: Minimum samples in a neighborhood for a core point
-            **kwargs: Additional arguments for DBSCAN
-
-        Returns:
-            Array of cluster labels (-1 indicates noise)
-        """
-        print(
-            f"\nPerforming DBSCAN clustering (eps={eps}, min_samples={min_samples})..."
-        )
-
-        dbscan = DBSCAN(eps=eps, min_samples=min_samples, **kwargs)
-        self.cluster_labels = dbscan.fit_predict(self.embeddings_normalized)
-        self.cluster_method = "dbscan"
-        self.cluster_params = {"eps": eps, "min_samples": min_samples}
-
-        # Compute metrics
-        n_clusters = len(set(self.cluster_labels)) - (
-            1 if -1 in self.cluster_labels else 0
-        )
-        n_noise = list(self.cluster_labels).count(-1)
-
-        print("Clustering complete!")
-        print(f"Number of clusters: {n_clusters}")
-        print(f"Number of noise points: {n_noise}")
-        print(
-            f"Cluster sizes: {np.bincount(self.cluster_labels[self.cluster_labels >= 0])}"
-        )
-
-        if n_clusters > 1:
-            # Only compute silhouette if we have multiple clusters
-            non_noise_mask = self.cluster_labels >= 0
-            if non_noise_mask.sum() > 0:
-                silhouette = silhouette_score(
-                    self.embeddings_normalized[non_noise_mask],
-                    self.cluster_labels[non_noise_mask],
-                )
-                print(f"Silhouette score (excluding noise): {silhouette:.3f}")
-
-        return self.cluster_labels
-
-    def find_optimal_k(
-        self,
-        k_range: Tuple[int, int] = (2, 20),
-        metric: str = "silhouette",
-    ) -> int:
-        """
-        Find optimal number of clusters using elbow method or silhouette score.
-
-        Args:
-            k_range: Range of k values to try (min, max)
-            metric: Metric to use ('silhouette' or 'inertia')
-
-        Returns:
-            Optimal k value
-        """
-        print(f"\nFinding optimal k in range {k_range}...")
-
-        k_values = range(k_range[0], k_range[1] + 1)
-        scores = []
-
-        for k in k_values:
-            kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
-            labels = kmeans.fit_predict(self.embeddings_normalized)
-
-            if metric == "silhouette":
-                score = silhouette_score(self.embeddings_normalized, labels)
-            elif metric == "inertia":
-                score = -kmeans.inertia_  # Negative for consistency (higher is better)
-            else:
-                raise ValueError(f"Unknown metric: {metric}")
-
-            scores.append(score)
-            print(f"k={k}: {metric}={score:.3f}")
-
-        # Find best k
-        optimal_k = k_values[np.argmax(scores)]
-        print(f"\nOptimal k: {optimal_k} (best {metric}: {max(scores):.3f})")
-
-        return optimal_k
-
-    def reduce_dimensions(
-        self,
-        method: str = "umap",
-        n_components: int = 2,
-        **kwargs,
-    ) -> np.ndarray:
-        """
-        Reduce dimensionality for visualization.
-
-        Args:
-            method: Reduction method ('pca', 'tsne', 'umap')
-            n_components: Number of components (usually 2 for visualization)
+            n_components: Number of dimensions to reduce to (30-50 recommended)
+            method: Reduction method ('pca' or 'umap')
+            random_state: Random seed for reproducibility
             **kwargs: Additional arguments for the reducer
 
         Returns:
             Reduced embeddings
         """
-        print(f"\nReducing dimensions with {method.upper()} to {n_components}D...")
+        print(
+            f"\nReducing dimensions with {method.upper()} to {n_components}D for clustering..."
+        )
 
         if method == "pca":
-            reducer = PCA(n_components=n_components, **kwargs)
-            reduced = reducer.fit_transform(self.embeddings_normalized)
+            reducer = PCA(
+                n_components=n_components, random_state=random_state, **kwargs
+            )
+            self.embeddings_reduced = reducer.fit_transform(self.embeddings_normalized)
             variance_explained = sum(reducer.explained_variance_ratio_)
             print(f"Variance explained: {variance_explained:.2%}")
 
-        elif method == "tsne":
-            reducer = TSNE(
-                n_components=n_components,
-                random_state=kwargs.get("random_state", 42),
-                **{k: v for k, v in kwargs.items() if k != "random_state"},
-            )
-            reduced = reducer.fit_transform(self.embeddings_normalized)
-
         elif method == "umap":
-            if not UMAP_AVAILABLE:
-                raise ImportError(
-                    "UMAP not available. Install with: pip install umap-learn"
-                )
             reducer = umap.UMAP(
-                n_components=n_components,
-                random_state=kwargs.get("random_state", 42),
-                **{k: v for k, v in kwargs.items() if k != "random_state"},
+                n_components=n_components, random_state=random_state, **kwargs
             )
-            reduced = reducer.fit_transform(self.embeddings_normalized)
+            self.embeddings_reduced = reducer.fit_transform(self.embeddings_normalized)
 
         else:
-            raise ValueError(f"Unknown method: {method}")
+            raise ValueError(
+                f"Unknown reduction method: {method}. Use 'pca' or 'umap'."
+            )
 
-        print(f"Reduction complete! Shape: {reduced.shape}")
-        return reduced
+        self.reduction_dim = n_components
+        print(f"Reduction complete! Shape: {self.embeddings_reduced.shape}")
+        return self.embeddings_reduced
+
+    def cluster_hdbscan(
+        self,
+        min_cluster_size: int = 10,
+        min_samples: Optional[int] = None,
+        metric: str = "euclidean",
+        cluster_selection_epsilon: float = 0.0,
+        **kwargs,
+    ) -> np.ndarray:
+        """
+        Perform HDBSCAN clustering on reduced embeddings.
+
+        Args:
+            min_cluster_size: Minimum size of clusters
+            min_samples: Conservative estimate of number of samples in a neighborhood.
+                        Defaults to min_cluster_size if not specified.
+            metric: Distance metric ('euclidean', 'manhattan', 'cosine', etc.)
+            cluster_selection_epsilon: Distance threshold for cluster merging
+            **kwargs: Additional arguments for HDBSCAN
+
+        Returns:
+            Array of cluster labels (-1 indicates noise)
+        """
+        if self.embeddings_reduced is None:
+            raise ValueError(
+                "Must call reduce_for_clustering() before clustering. "
+                "Use reduce_for_clustering() to reduce to 30-50 dimensions first."
+            )
+
+        print("\nPerforming HDBSCAN clustering...")
+        print(f"  min_cluster_size={min_cluster_size}")
+        print(f"  min_samples={min_samples or min_cluster_size}")
+        print(f"  metric={metric}")
+
+        self.clusterer = hdbscan.HDBSCAN(
+            min_cluster_size=min_cluster_size,
+            min_samples=min_samples,
+            metric=metric,
+            cluster_selection_epsilon=cluster_selection_epsilon,
+            **kwargs,
+        )
+
+        self.cluster_labels = self.clusterer.fit_predict(self.embeddings_reduced)
+
+        # Compute statistics
+        n_clusters = len(set(self.cluster_labels)) - (
+            1 if -1 in self.cluster_labels else 0
+        )
+        n_noise = list(self.cluster_labels).count(-1)
+        noise_percentage = 100 * n_noise / self.n_samples
+
+        print("\nClustering complete!")
+        print(f"Number of clusters: {n_clusters}")
+        print(f"Number of noise points: {n_noise} ({noise_percentage:.1f}%)")
+
+        if n_clusters > 0:
+            cluster_sizes = np.bincount(self.cluster_labels[self.cluster_labels >= 0])
+            print(f"Cluster sizes: {cluster_sizes}")
+            print(f"  Mean: {cluster_sizes.mean():.1f}")
+            print(f"  Median: {np.median(cluster_sizes):.1f}")
+            print(f"  Min: {cluster_sizes.min()}")
+            print(f"  Max: {cluster_sizes.max()}")
+
+        return self.cluster_labels
+
+    def reduce_for_visualization(
+        self,
+        method: str = "umap",
+        random_state: int = 42,
+        **kwargs,
+    ) -> np.ndarray:
+        """
+        Reduce to 2D for visualization.
+
+        Args:
+            method: Reduction method ('pca', 'umap')
+            random_state: Random seed for reproducibility
+            **kwargs: Additional arguments for the reducer
+
+        Returns:
+            2D reduced embeddings
+        """
+        print(f"\nReducing to 2D for visualization using {method.upper()}...")
+
+        # Use the clustered embeddings if available, otherwise use normalized
+        embeddings_to_reduce = (
+            self.embeddings_reduced
+            if self.embeddings_reduced is not None
+            else self.embeddings_normalized
+        )
+
+        if method == "pca":
+            reducer = PCA(n_components=2, random_state=random_state, **kwargs)
+            reduced_2d = reducer.fit_transform(embeddings_to_reduce)
+            variance_explained = sum(reducer.explained_variance_ratio_)
+            print(f"Variance explained: {variance_explained:.2%}")
+
+        elif method == "umap":
+            reducer = umap.UMAP(n_components=2, random_state=random_state, **kwargs)
+            reduced_2d = reducer.fit_transform(embeddings_to_reduce)
+
+        else:
+            raise ValueError(f"Unknown method: {method}. Use 'pca' or 'umap'.")
+
+        print(f"Reduction complete! Shape: {reduced_2d.shape}")
+        return reduced_2d
 
     def get_cluster_statistics(self) -> pd.DataFrame:
         """
@@ -262,7 +238,13 @@ class ClusterAnalyzer:
             mask = self.cluster_labels == label
             cluster_embeddings = self.embeddings_normalized[mask]
 
-            # Compute statistics
+            # Additional HDBSCAN-specific metrics
+            if self.clusterer is not None and label >= 0:
+                # Get cluster persistence (strength)
+                cluster_persistence = self.clusterer.cluster_persistence_[label]
+            else:
+                cluster_persistence = None
+
             stats.append(
                 {
                     "cluster": int(label),
@@ -270,6 +252,9 @@ class ClusterAnalyzer:
                     "percentage": float(100 * mask.sum() / self.n_samples),
                     "mean_norm": float(np.linalg.norm(cluster_embeddings.mean(axis=0))),
                     "std_norm": float(np.linalg.norm(cluster_embeddings.std(axis=0))),
+                    "persistence": float(cluster_persistence)
+                    if cluster_persistence is not None
+                    else None,
                 }
             )
 
@@ -277,48 +262,58 @@ class ClusterAnalyzer:
         df = df.sort_values("size", ascending=False)
         return df
 
+    def get_cluster_probabilities(self) -> Optional[np.ndarray]:
+        """
+        Get HDBSCAN cluster membership probabilities.
+
+        Returns:
+            Array of probabilities (or None if not available)
+        """
+        if self.clusterer is None:
+            return None
+        return self.clusterer.probabilities_
+
 
 def analyze_clusters(
     embedding_dir: str,
     output_dir: str,
     dataset_name: str = "Eladio/emrqa-msquad",
     split: str = "train",
-    embedding_type: str = "cls",
-    clustering_method: str = "kmeans",
-    n_clusters: Optional[int] = None,
-    dbscan_eps: float = 0.5,
-    dbscan_min_samples: int = 5,
-    reduction_method: str = "umap",
-    find_optimal: bool = False,
+    reduction_dim: int = 50,
+    reduction_method: str = "pca",
+    min_cluster_size: int = 10,
+    min_samples: Optional[int] = None,
+    metric: str = "euclidean",
+    visualization_method: str = "umap",
 ):
     """
-    Perform complete clustering analysis on embeddings.
+    Perform complete clustering analysis on embeddings using HDBSCAN.
 
     Args:
         embedding_dir: Directory containing embeddings
         output_dir: Directory to save results
         dataset_name: Dataset name (to load original examples)
         split: Dataset split
-        embedding_type: Type of embedding to analyze
-        clustering_method: Clustering algorithm ('kmeans' or 'dbscan')
-        n_clusters: Number of clusters for K-means (auto-detected if None)
-        dbscan_eps: DBSCAN epsilon parameter
-        dbscan_min_samples: DBSCAN min_samples parameter
-        reduction_method: Dimensionality reduction method
-        find_optimal: Whether to find optimal k before clustering
+        reduction_dim: Intermediate dimensionality (30-50 recommended)
+        reduction_method: Method for initial reduction ('pca' or 'umap')
+        min_cluster_size: Minimum size for HDBSCAN clusters
+        min_samples: Minimum samples for HDBSCAN (defaults to min_cluster_size)
+        metric: Distance metric for HDBSCAN
+        visualization_method: Method for 2D visualization ('umap' or 'pca')
     """
     os.makedirs(output_dir, exist_ok=True)
 
     print("=" * 70)
-    print("CLUSTERING ANALYSIS")
+    print("HDBSCAN CLUSTERING ANALYSIS")
     print("=" * 70)
 
     # Load embeddings
     print(f"\n1. Loading embeddings from {embedding_dir}...")
-    embeddings, metadata = load_embeddings(embedding_dir, embedding_type)
+    embeddings, metadata = load_embeddings(embedding_dir)
     print(
         f"   Loaded {embeddings.shape[0]} embeddings of dimension {embeddings.shape[1]}"
     )
+    print("   Embedding type: [CLS + answer span]")
 
     # Load dataset
     print(f"\n2. Loading dataset: {dataset_name}...")
@@ -342,35 +337,34 @@ def analyze_clusters(
     print(f"   Loaded {len(dataset_df)} examples")
 
     # Initialize analyzer
+    print("\n3. Initializing cluster analyzer...")
     analyzer = ClusterAnalyzer(embeddings)
 
-    # Find optimal k if requested
-    if clustering_method == "kmeans" and (find_optimal or n_clusters is None):
-        print("\n3. Finding optimal number of clusters...")
-        optimal_k = analyzer.find_optimal_k(k_range=(2, min(20, len(embeddings) // 50)))
-        n_clusters = n_clusters or optimal_k
-    else:
-        print(f"\n3. Using {n_clusters or 'auto'} clusters")
+    # Reduce dimensions for clustering
+    print(f"\n4. Reducing dimensions for clustering ({reduction_dim}D)...")
+    analyzer.reduce_for_clustering(
+        n_components=reduction_dim,
+        method=reduction_method,
+    )
 
-    # Perform clustering
-    print("\n4. Performing clustering...")
-    if clustering_method == "kmeans":
-        if n_clusters is None:
-            n_clusters = 10
-        cluster_labels = analyzer.cluster_kmeans(n_clusters=n_clusters)
-    elif clustering_method == "dbscan":
-        cluster_labels = analyzer.cluster_dbscan(
-            eps=dbscan_eps,
-            min_samples=dbscan_min_samples,
-        )
-    else:
-        raise ValueError(f"Unknown clustering method: {clustering_method}")
+    # Perform HDBSCAN clustering
+    print("\n5. Performing HDBSCAN clustering...")
+    cluster_labels = analyzer.cluster_hdbscan(
+        min_cluster_size=min_cluster_size,
+        min_samples=min_samples,
+        metric=metric,
+    )
 
     # Add cluster labels to dataframe
     dataset_df["cluster"] = cluster_labels
 
+    # Get cluster probabilities
+    probabilities = analyzer.get_cluster_probabilities()
+    if probabilities is not None:
+        dataset_df["cluster_probability"] = probabilities
+
     # Get cluster statistics
-    print("\n5. Computing cluster statistics...")
+    print("\n6. Computing cluster statistics...")
     cluster_stats = analyzer.get_cluster_statistics()
     print("\nCluster Statistics:")
     print(cluster_stats.to_string(index=False))
@@ -380,26 +374,43 @@ def analyze_clusters(
     cluster_stats.to_csv(stats_file, index=False)
     print(f"\nSaved cluster statistics to {stats_file}")
 
-    # Dimensionality reduction for visualization
-    print(f"\n6. Performing dimensionality reduction ({reduction_method.upper()})...")
-    reduced_embeddings = analyzer.reduce_dimensions(method=reduction_method)
+    # Reduce to 2D for visualization
+    print(f"\n7. Reducing to 2D for visualization ({visualization_method.upper()})...")
+    reduced_2d = analyzer.reduce_for_visualization(method=visualization_method)
 
-    dataset_df["dim1"] = reduced_embeddings[:, 0]
-    dataset_df["dim2"] = reduced_embeddings[:, 1]
+    dataset_df["dim1"] = reduced_2d[:, 0]
+    dataset_df["dim2"] = reduced_2d[:, 1]
 
     # Save results
-    print("\n7. Saving results...")
+    print("\n8. Saving results...")
 
     # Save cluster assignments
+    assignments_cols = ["id", "cluster", "dim1", "dim2"]
+    if "cluster_probability" in dataset_df.columns:
+        assignments_cols.append("cluster_probability")
+
     assignments_file = os.path.join(output_dir, "cluster_assignments.csv")
-    dataset_df[["id", "cluster", "dim1", "dim2"]].to_csv(assignments_file, index=False)
+    dataset_df[assignments_cols].to_csv(assignments_file, index=False)
     print(f"   Saved cluster assignments to {assignments_file}")
 
-    # Save cluster examples
+    # Save cluster examples (excluding noise)
     cluster_samples = {}
     for cluster_id in cluster_stats["cluster"].values:
         if cluster_id == -1:
-            continue  # Skip noise cluster for now
+            # Save some noise examples separately
+            noise_examples = dataset_df[dataset_df["cluster"] == -1].head(10)
+            cluster_samples["noise"] = [
+                {
+                    "id": row["id"],
+                    "question": row["question"],
+                    "context": row["context"][:200] + "..."
+                    if len(row["context"]) > 200
+                    else row["context"],
+                    "probability": float(row.get("cluster_probability", 0.0)),
+                }
+                for _, row in noise_examples.iterrows()
+            ]
+            continue
 
         cluster_examples = dataset_df[dataset_df["cluster"] == cluster_id].head(10)
         cluster_samples[f"cluster_{cluster_id}"] = [
@@ -409,6 +420,7 @@ def analyze_clusters(
                 "context": row["context"][:200] + "..."
                 if len(row["context"]) > 200
                 else row["context"],
+                "probability": float(row.get("cluster_probability", 1.0)),
             }
             for _, row in cluster_examples.iterrows()
         ]
@@ -421,13 +433,17 @@ def analyze_clusters(
     # Save metadata
     analysis_metadata = {
         "embedding_dir": embedding_dir,
-        "embedding_type": embedding_type,
         "n_samples": int(len(embeddings)),
         "embedding_dim": int(embeddings.shape[1]),
-        "clustering_method": clustering_method,
-        "clustering_params": analyzer.cluster_params,
-        "n_clusters": int(len(cluster_stats)),
+        "reduction_dim": reduction_dim,
         "reduction_method": reduction_method,
+        "clustering_method": "hdbscan",
+        "min_cluster_size": min_cluster_size,
+        "min_samples": min_samples or min_cluster_size,
+        "metric": metric,
+        "n_clusters": int((cluster_stats["cluster"] >= 0).sum()),
+        "n_noise": int((cluster_labels == -1).sum()),
+        "visualization_method": visualization_method,
     }
 
     metadata_file = os.path.join(output_dir, "cluster_metadata.json")
@@ -436,16 +452,16 @@ def analyze_clusters(
     print(f"   Saved metadata to {metadata_file}")
 
     # Create visualizations
-    print("\n8. Creating visualizations...")
+    print("\n9. Creating visualizations...")
     create_cluster_visualizations(
         dataset_df,
         cluster_stats,
         output_dir,
-        reduction_method,
+        visualization_method,
     )
 
     print("\n" + "=" * 70)
-    print("CLUSTERING ANALYSIS COMPLETE")
+    print("HDBSCAN CLUSTERING ANALYSIS COMPLETE")
     print("=" * 70)
     print(f"\nOutputs saved to: {output_dir}")
     print(f"- Cluster statistics: {stats_file}")
@@ -461,9 +477,9 @@ def create_cluster_visualizations(
     output_dir: str,
     reduction_method: str,
 ):
-    """Create visualizations for cluster analysis."""
+    """Create visualizations for HDBSCAN cluster analysis."""
 
-    # Plot 1: Cluster scatter plot
+    # Plot 1: Cluster scatter plot with probabilities
     fig, axes = plt.subplots(1, 2, figsize=(16, 6))
 
     # Scatter plot colored by cluster
@@ -476,18 +492,25 @@ def create_cluster_visualizations(
     for i, cluster_id in enumerate(unique_clusters):
         cluster_data = df[df["cluster"] == cluster_id]
         label = f"Cluster {cluster_id}" if cluster_id >= 0 else "Noise"
+
+        # Size by probability if available
+        if "cluster_probability" in df.columns:
+            sizes = cluster_data["cluster_probability"] * 50 + 10
+        else:
+            sizes = 20
+
         ax.scatter(
             cluster_data["dim1"],
             cluster_data["dim2"],
             c=[colors[i]],
             label=label,
-            alpha=0.6,
-            s=20,
+            alpha=0.6 if cluster_id >= 0 else 0.3,
+            s=sizes,
         )
 
     ax.set_xlabel(f"{reduction_method.upper()} Dimension 1", fontsize=12)
     ax.set_ylabel(f"{reduction_method.upper()} Dimension 2", fontsize=12)
-    ax.set_title("Cluster Visualization", fontsize=14, fontweight="bold")
+    ax.set_title("HDBSCAN Cluster Visualization", fontsize=14, fontweight="bold")
     ax.legend(bbox_to_anchor=(1.05, 1), loc="upper left", fontsize=9)
     ax.grid(True, alpha=0.3)
 
@@ -495,28 +518,29 @@ def create_cluster_visualizations(
     ax = axes[1]
     non_noise = cluster_stats[cluster_stats["cluster"] >= 0].copy()
 
-    bars = ax.bar(
-        non_noise["cluster"].astype(str),
-        non_noise["size"],
-        color=colors[: len(non_noise)],
-        alpha=0.7,
-    )
-    ax.set_xlabel("Cluster ID", fontsize=12)
-    ax.set_ylabel("Number of Examples", fontsize=12)
-    ax.set_title("Cluster Size Distribution", fontsize=14, fontweight="bold")
-    ax.grid(True, alpha=0.3, axis="y")
-
-    # Add value labels on bars
-    for bar in bars:
-        height = bar.get_height()
-        ax.text(
-            bar.get_x() + bar.get_width() / 2.0,
-            height,
-            f"{int(height)}",
-            ha="center",
-            va="bottom",
-            fontsize=9,
+    if len(non_noise) > 0:
+        bars = ax.bar(
+            non_noise["cluster"].astype(str),
+            non_noise["size"],
+            color=colors[: len(non_noise)],
+            alpha=0.7,
         )
+        ax.set_xlabel("Cluster ID", fontsize=12)
+        ax.set_ylabel("Number of Examples", fontsize=12)
+        ax.set_title("Cluster Size Distribution", fontsize=14, fontweight="bold")
+        ax.grid(True, alpha=0.3, axis="y")
+
+        # Add value labels on bars
+        for bar in bars:
+            height = bar.get_height()
+            ax.text(
+                bar.get_x() + bar.get_width() / 2.0,
+                height,
+                f"{int(height)}",
+                ha="center",
+                va="bottom",
+                fontsize=9,
+            )
 
     plt.tight_layout()
     fig_path = os.path.join(output_dir, "cluster_visualization.png")
@@ -524,46 +548,80 @@ def create_cluster_visualizations(
     print(f"   Saved cluster visualization to {fig_path}")
     plt.close()
 
-    # Plot 2: Cluster statistics
-    if len(non_noise) > 0:
+    # Plot 2: Cluster persistence (HDBSCAN-specific)
+    if "persistence" in cluster_stats.columns and len(non_noise) > 0:
         fig, ax = plt.subplots(figsize=(10, 6))
 
-        x = np.arange(len(non_noise))
-        width = 0.35
+        # Filter out None values
+        valid_persistence = non_noise[non_noise["persistence"].notna()].copy()
 
-        ax.bar(
-            x - width / 2,
-            non_noise["mean_norm"],
-            width,
-            label="Mean Norm",
-            alpha=0.7,
-        )
-        ax.bar(
-            x + width / 2,
-            non_noise["std_norm"],
-            width,
-            label="Std Norm",
-            alpha=0.7,
-        )
+        if len(valid_persistence) > 0:
+            bars = ax.bar(
+                valid_persistence["cluster"].astype(str),
+                valid_persistence["persistence"],
+                color=colors[: len(valid_persistence)],
+                alpha=0.7,
+            )
 
-        ax.set_xlabel("Cluster ID", fontsize=12)
-        ax.set_ylabel("Norm Value", fontsize=12)
-        ax.set_title("Cluster Embedding Statistics", fontsize=14, fontweight="bold")
-        ax.set_xticks(x)
-        ax.set_xticklabels(non_noise["cluster"].astype(str))
-        ax.legend()
+            ax.set_xlabel("Cluster ID", fontsize=12)
+            ax.set_ylabel("Cluster Persistence (Stability)", fontsize=12)
+            ax.set_title(
+                "HDBSCAN Cluster Persistence\n(Higher = More Stable)",
+                fontsize=14,
+                fontweight="bold",
+            )
+            ax.grid(True, alpha=0.3, axis="y")
+
+            plt.tight_layout()
+            fig_path = os.path.join(output_dir, "cluster_persistence.png")
+            plt.savefig(fig_path, dpi=300, bbox_inches="tight")
+            print(f"   Saved cluster persistence plot to {fig_path}")
+            plt.close()
+
+    # Plot 3: Probability distribution
+    if "cluster_probability" in df.columns:
+        fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+
+        # Histogram of all probabilities
+        ax = axes[0]
+        ax.hist(df["cluster_probability"], bins=50, alpha=0.7, edgecolor="black")
+        ax.set_xlabel("Cluster Membership Probability", fontsize=12)
+        ax.set_ylabel("Count", fontsize=12)
+        ax.set_title(
+            "Distribution of Cluster Probabilities", fontsize=14, fontweight="bold"
+        )
         ax.grid(True, alpha=0.3, axis="y")
 
+        # Box plot by cluster
+        ax = axes[1]
+        cluster_probs = [
+            df[df["cluster"] == c]["cluster_probability"].values
+            for c in sorted(df["cluster"].unique())
+            if c >= 0
+        ]
+
+        if cluster_probs:
+            ax.boxplot(
+                cluster_probs,
+                labels=[str(c) for c in sorted(df["cluster"].unique()) if c >= 0],
+            )
+            ax.set_xlabel("Cluster ID", fontsize=12)
+            ax.set_ylabel("Membership Probability", fontsize=12)
+            ax.set_title(
+                "Probability Distribution by Cluster", fontsize=14, fontweight="bold"
+            )
+            ax.grid(True, alpha=0.3, axis="y")
+
         plt.tight_layout()
-        fig_path = os.path.join(output_dir, "cluster_statistics_plot.png")
+        fig_path = os.path.join(output_dir, "cluster_probabilities.png")
         plt.savefig(fig_path, dpi=300, bbox_inches="tight")
-        print(f"   Saved cluster statistics plot to {fig_path}")
+        print(f"   Saved probability distribution plot to {fig_path}")
         plt.close()
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Perform clustering analysis on embeddings"
+        description="Perform HDBSCAN clustering analysis on embeddings"
     )
     parser.add_argument(
         "--embedding_dir",
@@ -590,47 +648,42 @@ if __name__ == "__main__":
         help="Dataset split to analyze",
     )
     parser.add_argument(
-        "--embedding_type",
-        type=str,
-        default="cls",
-        help="Type of embedding to analyze",
-    )
-    parser.add_argument(
-        "--clustering_method",
-        type=str,
-        default="kmeans",
-        choices=["kmeans", "dbscan"],
-        help="Clustering algorithm to use",
-    )
-    parser.add_argument(
-        "--n_clusters",
+        "--reduction_dim",
         type=int,
-        default=None,
-        help="Number of clusters (for K-means)",
-    )
-    parser.add_argument(
-        "--dbscan_eps",
-        type=float,
-        default=0.5,
-        help="DBSCAN epsilon parameter",
-    )
-    parser.add_argument(
-        "--dbscan_min_samples",
-        type=int,
-        default=5,
-        help="DBSCAN min_samples parameter",
+        default=50,
+        help="Intermediate dimensionality for clustering (30-50 recommended)",
     )
     parser.add_argument(
         "--reduction_method",
         type=str,
-        default="umap",
-        choices=["pca", "tsne", "umap"],
-        help="Dimensionality reduction method",
+        default="pca",
+        choices=["pca", "umap"],
+        help="Method for initial dimensionality reduction",
     )
     parser.add_argument(
-        "--find_optimal",
-        action="store_true",
-        help="Find optimal number of clusters",
+        "--min_cluster_size",
+        type=int,
+        default=10,
+        help="Minimum size for HDBSCAN clusters",
+    )
+    parser.add_argument(
+        "--min_samples",
+        type=int,
+        default=None,
+        help="Minimum samples for HDBSCAN (defaults to min_cluster_size)",
+    )
+    parser.add_argument(
+        "--metric",
+        type=str,
+        default="euclidean",
+        help="Distance metric for HDBSCAN",
+    )
+    parser.add_argument(
+        "--visualization_method",
+        type=str,
+        default="umap",
+        choices=["pca", "umap"],
+        help="Method for 2D visualization",
     )
 
     args = parser.parse_args()
@@ -640,11 +693,10 @@ if __name__ == "__main__":
         output_dir=args.output_dir,
         dataset_name=args.dataset,
         split=args.split,
-        embedding_type=args.embedding_type,
-        clustering_method=args.clustering_method,
-        n_clusters=args.n_clusters,
-        dbscan_eps=args.dbscan_eps,
-        dbscan_min_samples=args.dbscan_min_samples,
+        reduction_dim=args.reduction_dim,
         reduction_method=args.reduction_method,
-        find_optimal=args.find_optimal,
+        min_cluster_size=args.min_cluster_size,
+        min_samples=args.min_samples,
+        metric=args.metric,
+        visualization_method=args.visualization_method,
     )
