@@ -20,9 +20,60 @@ from helpers import (
     prepare_validation_dataset_qa,
 )
 
+from rule_based_errors import rule9_question_not_starting_with_qword
+from analyze_cartography import load_cartography_metrics, categorize_examples
+
 NUM_PREPROCESSING_WORKERS = 2
 
-
+def filter_ambiguous_non_questions(dataset, cartography_metrics_path):
+    """
+    Filter out examples that are both:
+    1. Categorized as 'ambiguous' by dataset cartography
+    2. Identified as non-questions by rule9_question_not_starting_with_qword
+    """
+    try:
+        # Load cartography metrics
+        cartography_df = load_cartography_metrics(cartography_metrics_path)
+        cartography_df = categorize_examples(cartography_df)
+        
+        # Get ambiguous example IDs
+        ambiguous_ids = set(cartography_df[cartography_df['category'] == 'ambiguous'].index.tolist())
+        
+        # Convert dataset to pandas for easier manipulation
+        df = dataset.to_pandas()
+        
+        # Identify examples to remove (ambiguous AND non-questions)
+        examples_to_remove = []
+        
+        for idx, row in df.iterrows():
+            example_id = row.get('id')
+            question = row.get('question', '')
+            
+            # Check if example is ambiguous AND a non-question
+            if (example_id in ambiguous_ids and 
+                rule9_question_not_starting_with_qword(question)):
+                examples_to_remove.append(idx)
+        
+        # Filter out the flagged examples
+        if examples_to_remove:
+            filtered_df = df.drop(examples_to_remove)
+            # Convert back to datasets format
+            from datasets import Dataset
+            filtered_dataset = Dataset.from_pandas(filtered_df)
+            
+            print(f"Removed {len(examples_to_remove)} examples that were both ambiguous and non-questions")
+            print(f"Original size: {len(df)}, Filtered size: {len(filtered_df)}")
+            
+            return filtered_dataset
+        else:
+            print("No examples found that are both ambiguous and non-questions")
+            return dataset
+            
+    except Exception as e:
+        print(f"Error loading cartography metrics: {e}")
+        print("Skipping filtering...")
+        return dataset
+    
 def main():
     argp = HfArgumentParser(TrainingArguments)
     # The HfArgumentParser object collects command-line arguments into an object (and provides default values for unspecified arguments).
@@ -93,6 +144,17 @@ def main():
         default="./cartography_output",
         help="Directory to save cartography outputs.",
     )
+    argp.add_argument(
+        "--filter_ambiguous_non_questions",
+        action="store_true", 
+        help="Filter out examples that are both ambiguous (by cartography) AND non-questions (by rule-based detection).",
+    )
+    argp.add_argument(
+        "--cartography_metrics_path",
+        type=str,
+        default=None,
+        help="Path to existing cartography metrics. If not provided, filtering will be skipped.",
+    )
 
     training_args, args = argp.parse_args_into_dataclasses()
 
@@ -156,6 +218,16 @@ def main():
     eval_dataset_featurized = None
     if training_args.do_train:
         train_dataset = dataset["train"]
+
+        # Filter ambiguous non-questions if requested and cartography metrics are available
+        if args.filter_ambiguous_non_questions and args.cartography_metrics_path:
+            print(f"\nFiltering ambiguous non-questions using cartography metrics from {args.cartography_metrics_path}")
+            original_size = len(train_dataset)
+            train_dataset = filter_ambiguous_non_questions(train_dataset, args.cartography_metrics_path)
+            filtered_size = len(train_dataset)
+            removed_count = original_size - filtered_size
+            print(f"Removed {removed_count} ambiguous non-question examples ({removed_count/original_size*100:.1f}%)\n")
+            
         if args.max_train_samples:
             train_dataset = train_dataset.select(range(args.max_train_samples))
         train_dataset_featurized = train_dataset.map(
