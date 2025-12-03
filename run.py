@@ -128,9 +128,13 @@ def main():
                 param.data = param.data.contiguous()
     tokenizer = AutoTokenizer.from_pretrained(args.model, use_fast=True)
     ablations = args.ablations
+    max_tokens_length = args.max_length
     # Select the dataset preprocessing function (these functions are defined in helpers.py)
     prepare_train_dataset = partial(
-        prepare_train_dataset_qa, tokenizer=tokenizer, ablations=ablations
+        prepare_train_dataset_qa,
+        tokenizer=tokenizer,
+        ablations=ablations,
+        max_seq_length=max_tokens_length,
     )
     prepare_eval_dataset = partial(prepare_validation_dataset_qa, tokenizer=tokenizer)
     print(

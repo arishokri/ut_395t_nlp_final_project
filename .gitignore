@@ -227,4 +227,5 @@ trained_models/
 test*/
 test*
 cartography_output_other/
+**example**
 
