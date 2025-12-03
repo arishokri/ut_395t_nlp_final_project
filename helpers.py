@@ -1,10 +1,12 @@
 import collections
+
 import hashlib
 from typing import Tuple
 
 import evaluate
 import numpy as np
 from tqdm.auto import tqdm
+from collections import OrderedDict
 from transformers import DefaultDataCollator, EvalPrediction, Trainer
 
 QA_MAX_ANSWER_LENGTH = 30
@@ -89,8 +91,28 @@ def normalize_answers_for_metrics(example):
 # Functions with signatures like this one work as the "compute_metrics" argument of transformers.Trainer.
 def compute_metrics(eval_preds: EvalPrediction):
     metric = evaluate.load("squad")
+
+    predictions = eval_preds.predictions
+    references = eval_preds.label_ids
+
+    # Build dicts keyed by id
+    preds_by_id = OrderedDict((p["id"], p) for p in predictions)
+    refs_by_id  = OrderedDict((r["id"], r) for r in references)
+
+    # Only keep IDs that have both a prediction and a reference
+    common_ids = [id_ for id_ in refs_by_id.keys() if id_ in preds_by_id]
+
+    aligned_predictions = [preds_by_id[id_] for id_ in common_ids]
+    aligned_references  = [refs_by_id[id_]  for id_ in common_ids]
+
+    # Sanity check
+    assert len(aligned_predictions) == len(aligned_references), (
+        f"Still mismatched: {len(aligned_predictions)} preds vs {len(aligned_references)} refs"
+    )
+
     return metric.compute(
-        predictions=eval_preds.predictions, references=eval_preds.label_ids
+        predictions=aligned_predictions,
+        references=aligned_references,
     )
 
 
