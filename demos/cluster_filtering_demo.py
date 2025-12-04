@@ -41,7 +41,7 @@ def demo_basic_cluster_filtering():
     filter_obj = ClusterFilter(
         dataset=train_data,
         cluster_path="./cluster_output",
-        exclude_clusters=[3, 4, -1],  # Exclude these clusters
+        exclude_clusters=[2, -1],  # Exclude these clusters
     )
 
     filtered_data = filter_obj.apply()
@@ -152,7 +152,7 @@ def demo_combined_filtering():
         "cluster": {
             "enabled": True,
             "cluster_path": "./cluster_output",
-            "exclude_clusters": [3, 4, -1],  # Exclude clusters 3, 4, and noise
+            "exclude_clusters": [1, 2, -1],  # Exclude clusters 3, 4, and noise
             "min_probability": 0.7,  # High confidence only
         },
     }
