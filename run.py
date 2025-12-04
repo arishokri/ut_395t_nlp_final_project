@@ -111,12 +111,11 @@ def main():
         default="./cluster_output",
         help="Path to cluster assignments directory or CSV file.",
     )
-    #! Provision of multiple clusters raises an error.
     argp.add_argument(
         "--exclude_clusters",
         type=str,
         default="-1",
-        help="Comma-separated list of cluster IDs to exclude (e.g., '3,4,-1'). Default: '-1' (excludes noise).",
+        help="Comma-separated list of cluster IDs to exclude (e.g., '3,4,-1'). Default: '-1' (excludes noise). Use --exclude_clusters=\"-1,1\" when including negative numbers.",
     )
 
     argp.add_argument(
@@ -153,18 +152,16 @@ def main():
         default=10.0,
         help="Maximum weight value for soft weighting (default: 10.0).",
     )
-    #! When using cartography on validation split I get a lot of errors.
     argp.add_argument(
         "--train_split",
         type=str,
         default="train",
         help="Dataset split to use for training (default: 'train'). Use 'validation' to run cartography on validation data.",
     )
-    # Validation filtering currenlty only applies when filter_cartography=true
     argp.add_argument(
         "--filter_validation",
         action="store_true",
-        help="Apply the same filtering strategies to the validation set.",
+        help="Apply cartography filtering to validation set. Note: Only applies when --filter_cartography is enabled (not used with --filter_clusters).",
     )
     argp.add_argument(
         "--validation_cartography_output_dir",
