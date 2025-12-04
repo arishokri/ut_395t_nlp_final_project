@@ -1,6 +1,7 @@
 # Sweep configuration combining filtering with smoothing/weighting
 # Experiments that combine data filtering strategies with training modifications
-# Evaluates on filtered validation set
+# Note: Validation filtering only applies when filter_cartography=true
+# (cluster filtering does not filter validation set to avoid cluster mismatch)
 
 program: run.py
 method: bayes # Bayesian optimization for efficiency
@@ -63,7 +64,8 @@ parameters:
   enable_cartography:
     value: false
 
-  # Apply filtering to validation set
+  # Apply filtering to validation set (only applies when filter_cartography=true)
+  # Note: Validation is NOT filtered in cluster filtering mode to avoid cluster mismatch
   filter_validation:
     value: true
 
@@ -111,10 +113,10 @@ command:
   - --output_dir
   - ./sweep_outputs/combined/${id}
   - --cartography_output_dir
-  - ./sweep_outputs/combined/${id}/cartography
+  - ./cartography_output
   - --cluster_assignments_path
   - ./cluster_output
   - --validation_cartography_output_dir
   - ./cartography_output_validation
-  - --validation_cluster_assignments_path
-  - ./cluster_output_validation
+  # - --validation_cluster_assignments_path
+  # - ./cluster_output_validation

@@ -91,4 +91,4 @@ command:
   - --output_dir
   - ./sweep_outputs/baseline/${id}
   - --cartography_output_dir
-  - ./sweep_outputs/baseline/${id}/cartography
+  - ./cartography_output

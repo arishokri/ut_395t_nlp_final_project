@@ -1,12 +1,11 @@
 # Sweep configuration for filtering strategies
 # Experiments with cartography filtering and cluster filtering on training set
-# Evaluates on filtered validation set (controlled by --filter_validation)
+# Note: Validation filtering only applies when filter_cartography=true
+# (cluster filtering does not filter validation set to avoid cluster mismatch)
 
 program: run.py
 method: grid # Exhaustive search over all combinations
 project: qa-cartography-experiments
-
-#! For Cluster filtering, we should not filter validation set.
 
 # Metric to optimize
 # Using F1 instead of exact_match because:
@@ -65,7 +64,8 @@ parameters:
   enable_cartography:
     value: false
 
-  # Apply filtering to validation set for all filtered training runs
+  # Apply filtering to validation set (only applies when filter_cartography=true)
+  # Note: Validation is NOT filtered in cluster filtering mode to avoid cluster mismatch
   filter_validation:
     value: true
 
@@ -94,10 +94,10 @@ command:
   - --output_dir
   - ./sweep_outputs/filtering/${id}
   - --cartography_output_dir
-  - ./sweep_outputs/filtering/${id}/cartography
+  - ./cartography_output
   - --cluster_assignments_path
   - ./cluster_output
   - --validation_cartography_output_dir
   - ./cartography_output_validation
-  - --validation_cluster_assignments_path
-  - ./cluster_output_validation
+  # - --validation_cluster_assignments_path
+  # - ./cluster_output_validation

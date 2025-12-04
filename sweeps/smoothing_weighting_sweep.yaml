@@ -102,4 +102,4 @@ command:
   - --output_dir
   - ./sweep_outputs/smoothing_weighting/${id}
   - --cartography_output_dir
-  - ./sweep_outputs/smoothing_weighting/${id}/cartography
+  - ./cartography_output
