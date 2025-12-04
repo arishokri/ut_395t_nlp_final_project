@@ -61,13 +61,13 @@ def launch_sweep(sweep_config_path: str, project: str = PROJECT_NAME) -> str:
     sweep_id = wandb.sweep(sweep=sweep_config_path, project=project)
 
     print(f"\n{'=' * 70}")
-    print(f"Sweep initialized successfully!")
+    print("Sweep initialized successfully!")
     print(f"{'=' * 70}")
     print(f"Sweep ID: {sweep_id}")
     print(f"Project: {project}")
-    print(f"\nTo run agents for this sweep:")
+    print("\nTo run agents for this sweep:")
     print(f"  wandb agent {project}/{sweep_id}")
-    print(f"\nOr use this script:")
+    print("\nOr use this script:")
     print(f"  python sweep_launcher.py --resume {sweep_id} --count <num_runs>")
     print(f"{'=' * 70}\n")
 
@@ -145,18 +145,18 @@ def get_sweep_status(sweep_id: str, project: str = PROJECT_NAME):
         print(f"Updated: {sweep.updated_at}")
 
         # Configuration
-        print(f"\nMetric to optimize:")
+        print("\nMetric to optimize:")
         metric = sweep.config.get("metric", {})
         print(f"  {metric.get('name', 'N/A')} ({metric.get('goal', 'N/A')})")
 
         # Best run
-        print(f"\nBest run:")
+        print("\nBest run:")
         if sweep.best_run():
             best = sweep.best_run()
             print(f"  Name: {best.name}")
             print(f"  ID: {best.id}")
             if hasattr(best, "summary"):
-                print(f"  Metrics:")
+                print("  Metrics:")
                 for key in ["eval/f1", "eval/exact_match", "train/loss"]:
                     if key in best.summary:
                         print(f"    {key}: {best.summary[key]:.4f}")
@@ -164,7 +164,7 @@ def get_sweep_status(sweep_id: str, project: str = PROJECT_NAME):
             print("  No completed runs yet")
 
         # Recent runs
-        print(f"\nRecent runs:")
+        print("\nRecent runs:")
         runs = list(sweep.runs)[:5]  # Last 5 runs
         for run in runs:
             status = run.state

@@ -24,8 +24,8 @@ Usage:
 
 import argparse
 import sys
-from collections import defaultdict
-from typing import Dict, List, Optional
+
+from typing import Dict, List
 
 import pandas as pd
 import wandb
@@ -130,14 +130,14 @@ def print_summary_statistics(df: pd.DataFrame):
 
     # Group by strategy type
     strategies = {
-        "Baseline": (df["filter_cartography"] == False)
-        & (df["filter_clusters"] == False)
-        & (df["use_label_smoothing"] == False)
-        & (df["use_soft_weighting"] == False),
-        "Cartography Filtering": df["filter_cartography"] == True,
-        "Cluster Filtering": df["filter_clusters"] == True,
-        "Label Smoothing": df["use_label_smoothing"] == True,
-        "Soft Weighting": df["use_soft_weighting"] == True,
+        "Baseline": (~df["filter_cartography"])
+        & (~df["filter_clusters"])
+        & (~df["use_label_smoothing"])
+        & (~df["use_soft_weighting"]),
+        "Cartography Filtering": df["filter_cartography"],
+        "Cluster Filtering": df["filter_clusters"],
+        "Label Smoothing": df["use_label_smoothing"],
+        "Soft Weighting": df["use_soft_weighting"],
     }
 
     print("\n" + "-" * 80)
@@ -166,10 +166,10 @@ def print_summary_statistics(df: pd.DataFrame):
 def compare_with_baseline(df: pd.DataFrame):
     """Compare all strategies against baseline."""
     baseline_mask = (
-        (df["filter_cartography"] == False)
-        & (df["filter_clusters"] == False)
-        & (df["use_label_smoothing"] == False)
-        & (df["use_soft_weighting"] == False)
+        (~df["filter_cartography"])
+        & (~df["filter_clusters"])
+        & (~df["use_label_smoothing"])
+        & (~df["use_soft_weighting"])
     )
 
     baseline_df = df[baseline_mask]
@@ -184,7 +184,7 @@ def compare_with_baseline(df: pd.DataFrame):
     print("\n" + "=" * 80)
     print("COMPARISON WITH BASELINE")
     print("=" * 80)
-    print(f"\nBaseline Performance:")
+    print("\nBaseline Performance:")
     print(f"  Mean F1: {baseline_f1_mean:.4f} ± {baseline_f1_std:.4f}")
     print(f"  Best F1: {baseline_df['eval_f1'].max():.4f}")
     print(f"  Runs: {len(baseline_df)}")
