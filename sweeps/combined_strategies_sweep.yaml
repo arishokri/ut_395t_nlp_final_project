@@ -1,0 +1,120 @@
+# Sweep configuration combining filtering with smoothing/weighting
+# Experiments that combine data filtering strategies with training modifications
+# Evaluates on filtered validation set
+
+program: run.py
+method: bayes # Bayesian optimization for efficiency
+project: qa-cartography-experiments
+
+# Metric to optimize
+# Using F1 instead of exact_match because:
+# - F1 is more lenient and rewards partial matches, providing better training signal
+# - Exact match is very strict (single char difference = wrong), can be noisy for model selection
+# - F1 correlates well with EM; both metrics are logged to W&B for comparison
+metric:
+  name: eval/f1
+  goal: maximize
+
+# Fixed parameters for all runs
+parameters:
+  # Model and dataset
+  model:
+    value: google/electra-small-discriminator
+  dataset:
+    value: Eladio/emrqa-msquad
+  max_length:
+    value: 512
+
+  # Dataset size limits (set to null for full dataset)
+  max_train_samples:
+    value: 5000 # null = use full training set
+  max_eval_samples:
+    value: 1000 # null = use full validation set
+
+  # Training configuration
+  do_train:
+    value: true
+  do_eval:
+    value: true
+  num_train_epochs:
+    value: 3
+  per_device_train_batch_size:
+    value: 64
+  save_strategy:
+    value: epoch
+  evaluation_strategy:
+    value: epoch
+  logging_strategy:
+    value: steps
+  logging_steps:
+    value: 100
+  save_total_limit:
+    value: 2
+  load_best_model_at_end:
+    value: true
+  metric_for_best_model:
+    value: f1
+
+  # W&B reporting
+  report_to:
+    value: wandb
+
+  # Enable cartography tracking
+  enable_cartography:
+    value: false
+
+  # Apply filtering to validation set
+  filter_validation:
+    value: true
+
+  # Combined strategies search space
+  filter_cartography:
+    values: [true, false]
+
+  filter_clusters:
+    values: [true, false]
+
+  exclude_clusters:
+    values: ["-1", "1", "2", "-1, 1, 2"]
+
+  min_cluster_probability:
+    values: ["0.6", "0.8", "0.9"]
+
+  use_label_smoothing:
+    values: [true, false]
+
+  smoothing_factor:
+    values: [0.2, 0.4, 0.6, 0.8]
+
+  use_soft_weighting:
+    values: [true, false]
+
+  weight_clip_min:
+    values: [0.05, 0.1, 0.2]
+
+  weight_clip_max:
+    values: [5.0, 10.0, 15.0]
+
+# Early termination for poorly performing runs
+early_terminate:
+  type: hyperband
+  min_iter: 3
+  eta: 2
+  s: 2
+
+# Output directory pattern
+command:
+  - ${env}
+  - python3
+  - ${program}
+  - ${args_no_hyphens}
+  - --output_dir
+  - ./sweep_outputs/combined/${id}
+  - --cartography_output_dir
+  - ./sweep_outputs/combined/${id}/cartography
+  - --cluster_assignments_path
+  - ./cluster_output
+  - --validation_cartography_output_dir
+  - ./cartography_output_validation
+  - --validation_cluster_assignments_path
+  - ./cluster_output_validation

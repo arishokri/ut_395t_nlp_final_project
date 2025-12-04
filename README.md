@@ -1,27 +1,83 @@
+## Hyperparameter Search System
+
+This repository includes a comprehensive hyperparameter search system using **Weights & Biases** for exploring different training strategies:
+
+- **Baseline runs** with multiple seeds
+- **Data filtering** (cartography-based, cluster-based)
+- **Label smoothing** with variability-based factors
+- **Soft weighting** for example importance
+- **Combined strategies** for synergistic effects
+
+### Quick Start
+
+```bash
+# 1. Setup
+uv sync
+wandb login
+
+# 2. Setup and prepare data
+./setup_sweeps.sh
+
+# 3. Run sweeps
+python sweep_launcher.py --sweep baseline --count 5
+python sweep_launcher.py --sweep filtering --count 20
+
+# 4. Analyze results
+python analyze_sweep_results.py --compare_with_baseline
+```
+
+---
+
 ## Training and evaluating a model
 
 ### General
 
 ```bash
-# To train:
-python3 run.py --do_train
+# Basic training with best model selection
+python3 run.py \
+  --do_train \
+  --do_eval \
+  --load_best_model_at_end \
+  --metric_for_best_model f1 \
+  --evaluation_strategy epoch
 
-# To evaluate:
+# Evaluate existing model
 python3 run.py --do_eval --model ./trainer_output
 
-# To use custom seed (default=42)
-python run.py --do_train --output_dir ./model_output --seed 456
+# Training with custom configuration
+python run.py \
+  --do_train \
+  --do_eval \
+  --output_dir ./model_output \
+  --num_train_epochs 5 \
+  --per_device_train_batch_size 16 \
+  --load_best_model_at_end \
+  --metric_for_best_model f1 \
+  --evaluation_strategy epoch \
+  --save_strategy epoch \
+  --seed 456
 
-# Optional arguments (see run.py for more):
---dataset
---output_dir
---num_train_epochs
---max_train_samples
---max_eval_samples
---per_device_train_batch_size
---save_total_limit
---save_strategy
---ablations
+# Quick test with limited samples
+python run.py \
+  --do_train \
+  --do_eval \
+  --max_train_samples 1000 \
+  --max_eval_samples 500 \
+  --num_train_epochs 2
+
+# Common arguments:
+--dataset                       # Dataset name (default: Eladio/emrqa-msquad)
+--output_dir                    # Model checkpoint directory
+--num_train_epochs              # Number of training epochs (default: 3)
+--per_device_train_batch_size   # Batch size per device (default: 8)
+--max_train_samples             # Limit training examples (optional)
+--max_eval_samples              # Limit evaluation examples (optional)
+--load_best_model_at_end        # Load best checkpoint (recommended)
+--metric_for_best_model         # Metric to use (f1 or exact_match)
+--evaluation_strategy           # When to evaluate (epoch, steps)
+--save_strategy                 # When to save checkpoints (epoch, steps)
+--seed                          # Random seed (default: 42)
+--ablations                     # q_only, p_only, or none
 
 ```
 

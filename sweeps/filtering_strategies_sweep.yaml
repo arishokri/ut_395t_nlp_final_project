@@ -1,0 +1,103 @@
+# Sweep configuration for filtering strategies
+# Experiments with cartography filtering and cluster filtering on training set
+# Evaluates on filtered validation set (controlled by --filter_validation)
+
+program: run.py
+method: grid # Exhaustive search over all combinations
+project: qa-cartography-experiments
+
+#! For Cluster filtering, we should not filter validation set.
+
+# Metric to optimize
+# Using F1 instead of exact_match because:
+# - F1 is more lenient and rewards partial matches, providing better training signal
+# - Exact match is very strict (single char difference = wrong), can be noisy for model selection
+# - F1 correlates well with EM; both metrics are logged to W&B for comparison
+metric:
+  name: eval/f1
+  goal: maximize
+
+# Fixed parameters for all runs
+parameters:
+  # Model and dataset
+  model:
+    value: google/electra-small-discriminator
+  dataset:
+    value: Eladio/emrqa-msquad
+  max_length:
+    value: 512
+
+  # Dataset size limits (set to null for full dataset)
+  max_train_samples:
+    value: 5000 # null = use full training set
+  max_eval_samples:
+    value: 1000 # null = use full validation set
+
+  # Training configuration
+  do_train:
+    value: true
+  do_eval:
+    value: true
+  num_train_epochs:
+    value: 3
+  per_device_train_batch_size:
+    value: 64
+  save_strategy:
+    value: epoch
+  evaluation_strategy:
+    value: epoch
+  logging_strategy:
+    value: steps
+  logging_steps:
+    value: 100
+  save_total_limit:
+    value: 2
+  load_best_model_at_end:
+    value: true
+  metric_for_best_model:
+    value: f1
+
+  # W&B reporting
+  report_to:
+    value: wandb
+
+  # Enable cartography tracking for all runs
+  enable_cartography:
+    value: false
+
+  # Apply filtering to validation set for all filtered training runs
+  filter_validation:
+    value: true
+
+  # Grid search over filtering strategies
+  filter_cartography:
+    values: [false, true]
+
+  filter_clusters:
+    values: [false, true]
+
+  # Cluster exclusion parameters (only relevant when filter_clusters=true)
+  exclude_clusters:
+    values: ["-1", "1", "2", "1, 2", "-1, 1", "-1, 2", "-1, 1, 2"]
+
+  min_cluster_probability:
+    distribution: uniform
+    min: 0.3
+    max: 0.9
+
+# Output directory pattern
+command:
+  - ${env}
+  - python3
+  - ${program}
+  - ${args_no_hyphens}
+  - --output_dir
+  - ./sweep_outputs/filtering/${id}
+  - --cartography_output_dir
+  - ./sweep_outputs/filtering/${id}/cartography
+  - --cluster_assignments_path
+  - ./cluster_output
+  - --validation_cartography_output_dir
+  - ./cartography_output_validation
+  - --validation_cluster_assignments_path
+  - ./cluster_output_validation

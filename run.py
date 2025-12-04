@@ -75,7 +75,7 @@ def main():
         default=None,
         help="Limit the number of examples to evaluate on.",
     )
-    # Additional parameter for the question only model training
+    #! Needs to be refactored and reworked.
     argp.add_argument(
         "--ablations",
         type=str,
@@ -99,6 +99,7 @@ def main():
         action="store_true",
         help="Filter dataset based on cartography metrics (removes ambiguous examples).",
     )
+    #! This one doesn't need to be applied to validation set on evaluation run (cluster mismatch.)
     argp.add_argument(
         "--filter_clusters",
         action="store_true",
@@ -110,12 +111,14 @@ def main():
         default="./cluster_output",
         help="Path to cluster assignments directory or CSV file.",
     )
+    #! Provision of multiple clusters raises an error.
     argp.add_argument(
         "--exclude_clusters",
         type=str,
         default="-1",
         help="Comma-separated list of cluster IDs to exclude (e.g., '3,4,-1'). Default: '-1' (excludes noise).",
     )
+    #! Make sure to include this in sweeps.
     argp.add_argument(
         "--min_cluster_probability",
         type=float,
@@ -150,6 +153,7 @@ def main():
         default=10.0,
         help="Maximum weight value for soft weighting (default: 10.0).",
     )
+    #! When using cartography on validation split I get a lot of errors.
     argp.add_argument(
         "--train_split",
         type=str,
@@ -173,8 +177,88 @@ def main():
         default="./cluster_output_validation",
         help="Path to cluster assignments for validation set (if different from training). Default: ./cluster_output_validation",
     )
+    argp.add_argument(
+        "--wandb_project",
+        type=str,
+        default="qa-cartography-experiments",
+        help="Weights & Biases project name for experiment tracking.",
+    )
+    argp.add_argument(
+        "--wandb_run_name",
+        type=str,
+        default=None,
+        help="Custom run name for W&B (auto-generated if not specified).",
+    )
+    argp.add_argument(
+        "--wandb_tags",
+        type=str,
+        default=None,
+        help="Comma-separated tags for W&B run (e.g., 'baseline,filtered,smoothing').",
+    )
 
     training_args, args = argp.parse_args_into_dataclasses()
+
+    # Initialize Weights & Biases if enabled
+    import wandb
+
+    wandb_enabled = training_args.report_to and "wandb" in training_args.report_to
+
+    if wandb_enabled:
+        # Parse tags if provided
+        tags = []
+        if args.wandb_tags:
+            tags = [tag.strip() for tag in args.wandb_tags.split(",")]
+
+        # Auto-generate run name if not provided
+        run_name = args.wandb_run_name
+        if run_name is None:
+            # Create descriptive name based on configuration
+            name_parts = []
+            if args.filter_cartography:
+                name_parts.append("cart_filt")
+            if args.filter_clusters:
+                name_parts.append(f"clust_filt_excl{args.exclude_clusters}")
+            if args.use_label_smoothing:
+                name_parts.append(f"smooth{args.smoothing_factor}")
+            if args.use_soft_weighting:
+                name_parts.append(
+                    f"weight_{args.weight_clip_min}-{args.weight_clip_max}"
+                )
+
+            run_name = "_".join(name_parts) if name_parts else "baseline"
+
+        # Initialize wandb with configuration
+        wandb.init(
+            project=args.wandb_project,
+            name=run_name,
+            tags=tags,
+            config={
+                # Model and dataset
+                "model": args.model,
+                "dataset": args.dataset,
+                "max_length": args.max_length,
+                "ablations": args.ablations,
+                # Training parameters (from TrainingArguments)
+                "num_train_epochs": training_args.num_train_epochs,
+                "per_device_train_batch_size": training_args.per_device_train_batch_size,
+                "learning_rate": training_args.learning_rate,
+                "seed": training_args.seed,
+                # Filtering strategies
+                "filter_cartography": args.filter_cartography,
+                "filter_clusters": args.filter_clusters,
+                "exclude_clusters": args.exclude_clusters,
+                "min_cluster_probability": args.min_cluster_probability,
+                "filter_validation": args.filter_validation,
+                # Training modifications
+                "use_label_smoothing": args.use_label_smoothing,
+                "smoothing_factor": args.smoothing_factor,
+                "use_soft_weighting": args.use_soft_weighting,
+                "weight_clip_min": args.weight_clip_min,
+                "weight_clip_max": args.weight_clip_max,
+                # Cartography
+                "enable_cartography": args.enable_cartography,
+            },
+        )
 
     # Dataset selection
     # IMPORTANT: this code path allows you to load custom datasets different from the standard SQuAD or SNLI ones.
@@ -274,6 +358,17 @@ def main():
             )
             print(f"{'=' * 70}\n")
 
+            # Log to wandb
+            if wandb_enabled:
+                wandb.log(
+                    {
+                        "train/original_size": original_size,
+                        "train/filtered_size": filtered_size,
+                        "train/removed_count": removed_count,
+                        "train/removal_percentage": removed_count / original_size * 100,
+                    }
+                )
+
         # Apply cluster filtering if requested
         if args.filter_clusters:
             if args.cluster_assignments_path is None:
@@ -321,6 +416,19 @@ def main():
                     f"  Removed: {removed_count} examples ({removed_count / original_size * 100:.1f}%)"
                 )
                 print(f"{'=' * 70}\n")
+
+                # Log to wandb
+                if wandb_enabled:
+                    wandb.log(
+                        {
+                            "train/cluster_original_size": original_size,
+                            "train/cluster_filtered_size": filtered_size,
+                            "train/cluster_removed_count": removed_count,
+                            "train/cluster_removal_percentage": removed_count
+                            / original_size
+                            * 100,
+                        }
+                    )
 
         train_dataset_featurized = train_dataset.map(
             prepare_train_dataset,
@@ -393,6 +501,19 @@ def main():
                 print(
                     f"  Removed: {removed_eval_count} examples ({removed_eval_count / original_eval_size * 100:.1f}%)"
                 )
+
+                # Log to wandb
+                if wandb_enabled:
+                    wandb.log(
+                        {
+                            "eval/original_size": original_eval_size,
+                            "eval/filtered_size": filtered_eval_size,
+                            "eval/removed_count": removed_eval_count,
+                            "eval/removal_percentage": removed_eval_count
+                            / original_eval_size
+                            * 100,
+                        }
+                    )
             print(f"{'=' * 70}\n")
 
         eval_dataset_featurized = eval_dataset.map(
@@ -572,6 +693,10 @@ def main():
                 ]
                 f.write(json.dumps(example_with_prediction))
                 f.write("\n")
+
+    # Finish wandb run
+    if wandb_enabled:
+        wandb.finish()
 
 
 if __name__ == "__main__":
