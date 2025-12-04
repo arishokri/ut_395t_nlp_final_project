@@ -219,10 +219,20 @@ __marimo__/
 uv.lock
 requirements.txt
 
-# Transformers
+
+# Project-specific output directories
 trainer_output/
+_kmeans/
+_dbscan/
+embeddings_output/
+cartography_output/
+cluster_output/
+eval_baseline_emrqa/
 trained_models/
+full_analysis_output/
+cartography_analysis/
 
 # Example Files/Directories
 cartography_output_other/
 *example*
+**OLD**
