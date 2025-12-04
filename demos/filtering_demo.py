@@ -4,10 +4,10 @@ Example script demonstrating dataset filtering usage.
 This script shows various ways to filter datasets based on cartography metrics.
 """
 
+# Making sure this can be run from outside the directory.
 import sys
 from pathlib import Path
 
-# Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import datasets

@@ -15,6 +15,7 @@ import pandas as pd
 from datasets import Dataset
 
 from analyze_cartography import categorize_examples, load_cartography_metrics
+from cluster_analysis import load_cluster_assignments
 
 
 class DatasetFilter:
@@ -292,6 +293,111 @@ class CategoryFilter(DatasetFilter):
             print(f"  - {cat}: {count} examples")
 
 
+class ClusterFilter(DatasetFilter):
+    """
+    Filter dataset based on cluster assignments.
+
+    Exclude examples from specific clusters (e.g., noise or unwanted semantic groups).
+    """
+
+    def __init__(
+        self,
+        dataset: Dataset,
+        cluster_path: str,
+        exclude_clusters: List[int] = None,
+        min_probability: Optional[float] = None,
+    ):
+        """
+        Initialize the cluster filter.
+
+        Args:
+            dataset: Dataset to filter
+            cluster_path: Path to cluster output directory or CSV file
+            exclude_clusters: List of cluster IDs to exclude (e.g., [3, 4, -1]).
+                            Default: [-1] (excludes noise). Use [] to keep all clusters.
+            min_probability: Minimum cluster probability threshold (if available)
+        """
+        super().__init__(dataset)
+        self.cluster_path = cluster_path
+        self.exclude_clusters = (
+            exclude_clusters if exclude_clusters is not None else [-1]
+        )
+        self.min_probability = min_probability
+        self.stats = {}
+
+    def apply(self) -> Dataset:
+        """
+        Apply the cluster filter.
+
+        Returns:
+            Filtered dataset excluding specified clusters
+        """
+        try:
+            # Load cluster assignments
+            cluster_df = load_cluster_assignments(self.cluster_path)
+
+            # Start with all IDs
+            keep_ids = set(cluster_df.index)
+
+            # Exclude specified clusters
+            if self.exclude_clusters:
+                exclude_ids = set(
+                    cluster_df[cluster_df["cluster"].isin(self.exclude_clusters)].index
+                )
+                keep_ids = keep_ids - exclude_ids
+
+            # Apply probability threshold if specified
+            if (
+                self.min_probability is not None
+                and "cluster_probability" in cluster_df.columns
+            ):
+                low_prob_ids = set(
+                    cluster_df[
+                        cluster_df["cluster_probability"] < self.min_probability
+                    ].index
+                )
+                keep_ids = keep_ids - low_prob_ids
+                self.stats["removed_low_probability"] = len(low_prob_ids)
+
+            # Filter dataset
+            df = self.dataset.to_pandas()
+            keep_indices = [
+                idx for idx, row in df.iterrows() if row.get("id") in keep_ids
+            ]
+
+            filtered_df = df.iloc[keep_indices].reset_index(drop=True)
+            filtered_dataset = Dataset.from_pandas(filtered_df)
+
+            # Track cluster statistics
+            kept_cluster_df = cluster_df[cluster_df.index.isin(keep_ids)]
+            for cluster_id in kept_cluster_df["cluster"].unique():
+                count = (kept_cluster_df["cluster"] == cluster_id).sum()
+                cluster_label = "noise" if cluster_id == -1 else f"cluster_{cluster_id}"
+                self.stats[cluster_label] = count
+
+            self._print_stats(filtered_dataset)
+
+            return filtered_dataset
+
+        except Exception as e:
+            print(f"Error during cluster filtering: {e}")
+            print("Returning original dataset without filtering...")
+            return self.dataset
+
+    def _print_stats(self, filtered_dataset: Dataset):
+        """Print filtering statistics."""
+        print(f"Original size: {self.original_size}")
+        print(f"Filtered size: {len(filtered_dataset)}")
+        print("Clusters kept:")
+        for cluster_label, count in sorted(self.stats.items()):
+            if not cluster_label.startswith("removed"):
+                print(f"  - {cluster_label}: {count} examples")
+        if "removed_low_probability" in self.stats:
+            print(
+                f"Removed low probability: {self.stats['removed_low_probability']} examples"
+            )
+
+
 class ConfidenceThresholdFilter(DatasetFilter):
     """
     Filter dataset based on confidence thresholds.
@@ -408,6 +514,12 @@ def apply_filters(
                     "metrics_path": "./cartography_output",
                     "min_confidence": 0.5,
                     "max_confidence": None
+                },
+                "cluster": {
+                    "enabled": False,
+                    "cluster_path": "./cluster_output",
+                    "exclude_clusters": [-1],
+                    "min_probability": None
                 }
             }
 
@@ -456,6 +568,21 @@ def apply_filters(
             metrics_path=config["metrics_path"],
             min_confidence=config.get("min_confidence"),
             max_confidence=config.get("max_confidence"),
+        )
+        filtered_dataset = filter_obj.apply()
+        print("=" * 70 + "\n")
+
+    # Apply cluster filter
+    if filter_config.get("cluster", {}).get("enabled", False):
+        config = filter_config["cluster"]
+        print("\n" + "=" * 70)
+        print("Applying Cluster Filter")
+        print("=" * 70)
+        filter_obj = ClusterFilter(
+            dataset=filtered_dataset,
+            cluster_path=config["cluster_path"],
+            exclude_clusters=config.get("exclude_clusters", [-1]),
+            min_probability=config.get("min_probability"),
         )
         filtered_dataset = filter_obj.apply()
         print("=" * 70 + "\n")

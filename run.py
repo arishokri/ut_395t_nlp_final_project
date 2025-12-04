@@ -95,15 +95,38 @@ def main():
         help="Directory to save cartography outputs.",
     )
     argp.add_argument(
-        "--filter_data",
+        "--filter_cartography",
         action="store_true",
-        help="Filter out examples that are both ambiguous (by cartography) AND non-questions (by rule-based detection).",
+        help="Filter dataset based on cartography metrics (removes ambiguous examples).",
     )
     argp.add_argument(
         "--cartography_metrics_path",
         type=str,
         default=None,
         help="Path to existing cartography metrics. If not provided, filtering will be skipped.",
+    )
+    argp.add_argument(
+        "--filter_clusters",
+        action="store_true",
+        help="Filter dataset based on cluster assignments.",
+    )
+    argp.add_argument(
+        "--cluster_assignments_path",
+        type=str,
+        default=None,
+        help="Path to cluster assignments directory or CSV file.",
+    )
+    argp.add_argument(
+        "--exclude_clusters",
+        type=str,
+        default="-1",
+        help="Comma-separated list of cluster IDs to exclude (e.g., '3,4,-1'). Default: '-1' (excludes noise).",
+    )
+    argp.add_argument(
+        "--min_cluster_probability",
+        type=float,
+        default=None,
+        help="Minimum cluster probability threshold for filtering (0.0-1.0).",
     )
 
     training_args, args = argp.parse_args_into_dataclasses()
@@ -172,11 +195,11 @@ def main():
         if args.max_train_samples:
             train_dataset = train_dataset.select(range(args.max_train_samples))
 
-        # Apply dataset filtering if requested
-        if args.filter_data:
+        # Apply cartography filtering if requested
+        if args.filter_cartography:
             cartography_output_dir = args.cartography_output_dir
             print(f"\n{'=' * 70}")
-            print("APPLYING DATASET FILTERING")
+            print("APPLYING CARTOGRAPHY FILTERING")
             print(f"{'=' * 70}")
             print(f"Using cartography metrics from: {cartography_output_dir}")
 
@@ -206,6 +229,54 @@ def main():
                 f"  Removed: {removed_count} examples ({removed_count / original_size * 100:.1f}%)"
             )
             print(f"{'=' * 70}\n")
+
+        # Apply cluster filtering if requested
+        if args.filter_clusters:
+            if args.cluster_assignments_path is None:
+                print(
+                    "\nWarning: --filter_clusters specified but no --cluster_assignments_path provided."
+                )
+                print("Skipping cluster filtering.\n")
+            else:
+                print(f"\n{'=' * 70}")
+                print("APPLYING CLUSTER FILTERING")
+                print(f"{'=' * 70}")
+                print(
+                    f"Using cluster assignments from: {args.cluster_assignments_path}"
+                )
+
+                original_size = len(train_dataset)
+
+                # Parse exclude_clusters list (empty string means exclude nothing)
+                exclude_clusters = []
+                if args.exclude_clusters.strip():  # Only parse if not empty
+                    exclude_clusters = [
+                        int(c.strip()) for c in args.exclude_clusters.split(",")
+                    ]
+
+                # Create cluster filter configuration
+                filter_config = {
+                    "cluster": {
+                        "enabled": True,
+                        "cluster_path": args.cluster_assignments_path,
+                        "exclude_clusters": exclude_clusters,
+                        "min_probability": args.min_cluster_probability,
+                    }
+                }
+
+                # Apply filters
+                train_dataset = apply_filters(train_dataset, filter_config)
+
+                filtered_size = len(train_dataset)
+                removed_count = original_size - filtered_size
+
+                print("\nCluster Filtering Summary:")
+                print(f"  Original size: {original_size}")
+                print(f"  Filtered size: {filtered_size}")
+                print(
+                    f"  Removed: {removed_count} examples ({removed_count / original_size * 100:.1f}%)"
+                )
+                print(f"{'=' * 70}\n")
 
         train_dataset_featurized = train_dataset.map(
             prepare_train_dataset,

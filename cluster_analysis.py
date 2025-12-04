@@ -33,6 +33,33 @@ from helpers import generate_hash_ids
 warnings.filterwarnings("ignore", category=FutureWarning, module="sklearn")
 
 
+def load_cluster_assignments(cluster_path: str) -> pd.DataFrame:
+    """
+    Load cluster assignments from file or directory.
+
+    Args:
+        cluster_path: Path to cluster output directory or CSV file
+
+    Returns:
+        DataFrame with cluster assignments (indexed by example_id)
+    """
+    if os.path.isdir(cluster_path):
+        # Load from cluster_assignments.csv in the directory
+        csv_path = os.path.join(cluster_path, "cluster_assignments.csv")
+        if not os.path.exists(csv_path):
+            raise FileNotFoundError(
+                f"cluster_assignments.csv not found in {cluster_path}"
+            )
+        cluster_df = pd.read_csv(csv_path, index_col="id")
+    elif os.path.isfile(cluster_path):
+        # Load CSV directly
+        cluster_df = pd.read_csv(cluster_path, index_col="id")
+    else:
+        raise FileNotFoundError(f"Cluster assignments not found: {cluster_path}")
+
+    return cluster_df
+
+
 class ClusterAnalyzer:
     """
     Performs clustering analysis on embeddings using HDBSCAN.
