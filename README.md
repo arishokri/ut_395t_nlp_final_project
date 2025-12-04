@@ -130,6 +130,53 @@ This generates:
 - **Category samples**: Example questions from each category
 - **Additional visualizations**: Distributions, correlations, breakdowns
 
+## Embedding-Based Clustering
+
+Complement cartography with embedding-based clustering to identify semantic regions in your dataset. This helps discover:
+
+- Groups of semantically similar questions
+- Problematic clusters where the model struggles
+- Overlap between semantic similarity and learning difficulty
+
+### Embedding Design
+
+Embeddings use a **[CLS + answer span]** design that captures both global and local semantics:
+
+- **[CLS] token** from (question, context) encoding → global semantic context
+- **Mean-pooled answer span tokens** → local answer representation
+- **Result**: 512D embeddings (256D + 256D for ELECTRA-small)
+
+This design helps identify examples where the answer is misaligned with the overall context.
+
+### Quick Start
+
+```bash
+# 1. Extract embeddings from trained model
+python extract_embeddings.py \
+  --model_path ./trainer_output \
+  --output_dir ./embeddings_output
+
+# 2. Cluster with HDBSCAN (PCA → HDBSCAN → UMAP visualization)
+python cluster_analysis.py \
+  --embedding_dir ./embeddings_output \
+  --output_dir ./cluster_output \
+  --reduction_dim 50 \
+  --min_cluster_size 15
+
+# 3. Integrated analysis (cartography + clustering)
+python analyze_dataset.py \
+  --cartography_dir ./cartography_output \
+  --cluster_dir ./cluster_output \
+  --output_dir ./integrated_analysis
+```
+
+### Key Features
+
+- **HDBSCAN clustering**: Automatic cluster discovery without specifying K
+- **Two-stage dimensionality reduction**: PCA (512→50D) for clustering, UMAP (50→2D) for visualization
+- **Cluster quality metrics**: Persistence scores and membership probabilities
+- **Noise detection**: Identifies outliers and anomalous examples
+
 ## Dataset Filtering
 
 The `dataset_filters.py` module provides flexible filtering strategies based on analysis results (e.g., cartography metrics). This enables:
