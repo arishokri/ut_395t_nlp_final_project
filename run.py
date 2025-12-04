@@ -11,6 +11,7 @@ from transformers import (
 )
 
 from dataset_cartography import DatasetCartographyCallback
+from dataset_filters import apply_filters
 from helpers import (
     DataCollatorWithExampleId,
     QuestionAnsweringTrainer,
@@ -20,94 +21,9 @@ from helpers import (
     prepare_validation_dataset_qa,
 )
 
-from rule_based_errors import rule9_question_not_starting_with_qword
-from analyze_cartography import load_cartography_metrics, categorize_examples
-
 NUM_PREPROCESSING_WORKERS = 2
 
-def filter_ambiguous_questions(dataset, cartography_metrics_path, top_fraction=0.33):
-    """
-    Keep:
-      - all non-ambiguous examples
-      - only the top `top_fraction` most ambiguous examples
-        (based on instability = (1 - confidence) + variability)
-    and within those top ambiguous examples, drop ones that are non-questions
-    according to rule9_question_not_starting_with_qword.
-    """
-    try:
-        import pandas as pd
-        from datasets import Dataset
 
-        # 1. Load cartography metrics and categorize
-        cartography_df = load_cartography_metrics(cartography_metrics_path)
-        cartography_df = categorize_examples(cartography_df)
-        
-        # Sanity: restrict to ambiguous examples
-        ambiguous_df = cartography_df[cartography_df["category"] == "ambiguous"].copy()
-        if ambiguous_df.empty:
-            print("No ambiguous examples found in cartography metrics; returning original dataset.")
-            return dataset
-
-        # 2. Compute instability = (1 - confidence) + variability        
-        ambiguous_df["instability"] = (1.0 - ambiguous_df["confidence"]) + ambiguous_df["variability"]
-
-        # 3. Find threshold for top `top_fraction` most ambiguous (highest instability)
-        # e.g., top 33% → quantile at 1 - 0.33 = 0.67
-        keep_quantile = 1.0 - top_fraction
-        threshold = ambiguous_df["instability"].quantile(keep_quantile)
-
-        # IDs of ambiguous examples in the top `top_fraction` most unstable
-        top_ambiguous_df = ambiguous_df[ambiguous_df["instability"] >= threshold]
-        top_ambiguous_ids = set(top_ambiguous_df.index.tolist())
-
-        # All ambiguous IDs (to know which rows are ambiguous at all)
-        all_ambiguous_ids = set(ambiguous_df.index.tolist())
-
-        # 4. Convert HF dataset to pandas for easier manipulation
-        df = dataset.to_pandas()
-
-        keep_indices = []
-        removed_ambiguous_not_top = 0
-        removed_nonquestion_top_ambiguous = 0
-
-        for idx, row in df.iterrows():
-            example_id = row.get("id")
-            question = row.get("question", "")
-
-            # Is this example ambiguous according to cartography?
-            if example_id in all_ambiguous_ids:
-                # Only keep if in top-33% most ambiguous
-                if example_id not in top_ambiguous_ids:
-                    removed_ambiguous_not_top += 1
-                    continue
-
-                # For those top ambiguous, drop non-questions (rule9)
-                # if rule9_question_not_starting_with_qword(question):
-                #     removed_nonquestion_top_ambiguous += 1
-                #     continue
-
-                # Otherwise, keep this ambiguous example
-                keep_indices.append(idx)
-            # change this for easy+hard filter later
-            else:
-                # Non-ambiguous examples are always kept
-                keep_indices.append(idx)
-
-        filtered_df = df.iloc[keep_indices].reset_index(drop=True)
-        filtered_dataset = Dataset.from_pandas(filtered_df)
-
-        print(f"Original size: {len(df)}")
-        print(f"Filtered size: {len(filtered_df)}")
-        print(f"Dropped ambiguous not in top {int(top_fraction * 100)}%: {removed_ambiguous_not_top}")
-
-        return filtered_dataset
-
-    except Exception as e:
-        print(f"Error during ambiguous filtering: {e}")
-        print("Returning original dataset without filtering...")
-        return dataset
-
-    
 def main():
     argp = HfArgumentParser(TrainingArguments)
     # The HfArgumentParser object collects command-line arguments into an object (and provides default values for unspecified arguments).
@@ -179,8 +95,8 @@ def main():
         help="Directory to save cartography outputs.",
     )
     argp.add_argument(
-        "--filter_ambiguous_questions",
-        action="store_true", 
+        "--filter_data",
+        action="store_true",
         help="Filter out examples that are both ambiguous (by cartography) AND non-questions (by rule-based detection).",
     )
     argp.add_argument(
@@ -253,17 +169,44 @@ def main():
     if training_args.do_train:
         train_dataset = dataset["train"]
 
-        # Filter ambiguous non-questions if requested and cartography metrics are available
-        if args.filter_ambiguous_questions and args.cartography_metrics_path:
-            print(f"\nFiltering ambiguous non-questions using cartography metrics from {args.cartography_metrics_path}")
-            original_size = len(train_dataset)
-            train_dataset = filter_ambiguous_questions(train_dataset, args.cartography_metrics_path)
-            filtered_size = len(train_dataset)
-            removed_count = original_size - filtered_size
-            print(f"Removed {removed_count} ambiguous non-question examples ({removed_count/original_size*100:.1f}%)\n")
-            
         if args.max_train_samples:
             train_dataset = train_dataset.select(range(args.max_train_samples))
+
+        # Apply dataset filtering if requested
+        if args.filter_data:
+            cartography_output_dir = args.cartography_output_dir
+            print(f"\n{'=' * 70}")
+            print("APPLYING DATASET FILTERING")
+            print(f"{'=' * 70}")
+            print(f"Using cartography metrics from: {cartography_output_dir}")
+
+            original_size = len(train_dataset)
+
+            # Create filter configuration
+            #! Currently we're not using any of the rule-based.
+            filter_config = {
+                "ambiguous": {
+                    "enabled": True,
+                    "metrics_path": cartography_output_dir,
+                    "top_fraction": 0.33,
+                    "apply_rule_based_filter": False,
+                }
+            }
+
+            # Apply filters
+            train_dataset = apply_filters(train_dataset, filter_config)
+
+            filtered_size = len(train_dataset)
+            removed_count = original_size - filtered_size
+
+            print("\nFiltering Summary:")
+            print(f"  Original size: {original_size}")
+            print(f"  Filtered size: {filtered_size}")
+            print(
+                f"  Removed: {removed_count} examples ({removed_count / original_size * 100:.1f}%)"
+            )
+            print(f"{'=' * 70}\n")
+
         train_dataset_featurized = train_dataset.map(
             prepare_train_dataset,
             batched=True,

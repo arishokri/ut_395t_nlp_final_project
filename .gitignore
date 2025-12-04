@@ -238,6 +238,7 @@ cartography_output_other/
 *example*
 **OLD**
 notebooks/*.json
+extra_guides/
 
 
 

@@ -132,14 +132,14 @@ def main():
 
         samples[category] = category_examples
         print(f"   - {category:12s}: {len(category_examples)} examples")
-        
+
         # Save each category to its own file
         category_file = os.path.join(args.output_dir, f"{category}_samples.json")
         with open(category_file, "w") as f:
             json.dump(category_examples, f, indent=2, default=str)
         samples_files[category] = category_file
 
-    print(f"\n   Saved category samples to separate files:")
+    print("\n   Saved category samples to separate files:")
     for category, filepath in samples_files.items():
         print(f"   - {category}: {filepath}")
 

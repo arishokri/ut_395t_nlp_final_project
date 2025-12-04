@@ -1,12 +1,11 @@
 import collections
-
 import hashlib
+from collections import OrderedDict
 from typing import Tuple
 
 import evaluate
 import numpy as np
 from tqdm.auto import tqdm
-from collections import OrderedDict
 from transformers import DefaultDataCollator, EvalPrediction, Trainer
 
 QA_MAX_ANSWER_LENGTH = 30
@@ -58,7 +57,7 @@ class DataCollatorWithExampleId(DefaultDataCollator):
 def generate_hash_ids(example):
     """Generates a deterministic ID based on hash value if the dataset is missing ID column."""
     content = f"{example['question']} | {example['context']}"
-    #! If slow, consider using xxhash.xxh64() instead.
+    # If slow, consider using xxhash.xxh64() instead.
     hash_obj = hashlib.md5(content.encode("utf-8"))
     return {"id": hash_obj.hexdigest()[:16]}
 
@@ -97,13 +96,13 @@ def compute_metrics(eval_preds: EvalPrediction):
 
     # Build dicts keyed by id
     preds_by_id = OrderedDict((p["id"], p) for p in predictions)
-    refs_by_id  = OrderedDict((r["id"], r) for r in references)
+    refs_by_id = OrderedDict((r["id"], r) for r in references)
 
     # Only keep IDs that have both a prediction and a reference
     common_ids = [id_ for id_ in refs_by_id.keys() if id_ in preds_by_id]
 
     aligned_predictions = [preds_by_id[id_] for id_ in common_ids]
-    aligned_references  = [refs_by_id[id_]  for id_ in common_ids]
+    aligned_references = [refs_by_id[id_] for id_ in common_ids]
 
     # Sanity check
     assert len(aligned_predictions) == len(aligned_references), (

@@ -130,6 +130,74 @@ This generates:
 - **Category samples**: Example questions from each category
 - **Additional visualizations**: Distributions, correlations, breakdowns
 
+## Dataset Filtering
+
+The `dataset_filters.py` module provides flexible filtering strategies based on analysis results (e.g., cartography metrics). This enables:
+
+- Removing low-quality ambiguous examples
+- Curriculum learning (training on easy examples first)
+- Focused training (training only on hard examples)
+- Confidence-based filtering
+
+### Quick Start
+
+First, generate cartography metrics:
+
+```bash
+python run.py \
+  --do_train \
+  --num_train_epochs 5 \
+  --enable_cartography \
+  --cartography_output_dir ./cartography_output \
+  --output_dir ./initial_model
+```
+
+Then train with filtered data:
+
+```bash
+python run.py \
+  --do_train \
+  --num_train_epochs 3 \
+  --filter_data \
+  --cartography_output_dir ./cartography_output \
+  --output_dir ./filtered_model
+```
+
+### Available Filters
+
+1. **AmbiguousQuestionFilter**: Removes low-quality ambiguous examples
+2. **CategoryFilter**: Keeps only specific categories (easy/hard/ambiguous)
+3. **ConfidenceThresholdFilter**: Filters by confidence ranges
+
+### Programmatic Usage
+
+```python
+from dataset_filters import apply_filters
+
+# Define filter configuration
+filter_config = {
+    "ambiguous": {
+        "enabled": True,
+        "cartography_metrics_path": "./cartography_output",
+        "top_fraction": 0.33,  # Keep top 33% most ambiguous
+    },
+    "category": {
+        "enabled": True,
+        "cartography_metrics_path": "./cartography_output",
+        "categories": ["easy", "hard"]  # Drop all ambiguous
+    }
+}
+
+# Apply filters
+filtered_dataset = apply_filters(dataset, filter_config)
+```
+
+Run example scripts:
+
+```bash
+python examples/filtering_examples.py
+```
+
 ## Version Controlling and Git Practices
 
 Make sure you add/install packages only using `uv add <package_name>` if you are using uv. Otherwise make sure you manually add them (in alphabetical order) to the `pyproject.toml` file.
