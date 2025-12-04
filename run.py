@@ -107,7 +107,7 @@ def main():
     argp.add_argument(
         "--cluster_assignments_path",
         type=str,
-        default=None,
+        default="./cluster_output",
         help="Path to cluster assignments directory or CSV file.",
     )
     argp.add_argument(
@@ -155,6 +155,23 @@ def main():
         type=str,
         default="train",
         help="Dataset split to use for training (default: 'train'). Use 'validation' to run cartography on validation data.",
+    )
+    argp.add_argument(
+        "--filter_validation",
+        action="store_true",
+        help="Apply the same filtering strategies to the validation set.",
+    )
+    argp.add_argument(
+        "--validation_cartography_output_dir",
+        type=str,
+        default="./cartography_output_validation",
+        help="Directory with cartography metrics for validation set (if different from training). Default: ./cartography_output_validation",
+    )
+    argp.add_argument(
+        "--validation_cluster_assignments_path",
+        type=str,
+        default="./cluster_output_validation",
+        help="Path to cluster assignments for validation set (if different from training). Default: ./cluster_output_validation",
     )
 
     training_args, args = argp.parse_args_into_dataclasses()
@@ -315,6 +332,69 @@ def main():
         eval_dataset = dataset[eval_split]
         if args.max_eval_samples:
             eval_dataset = eval_dataset.select(range(args.max_eval_samples))
+
+        # Apply filtering to validation set if requested
+        if args.filter_validation:
+            print(f"\n{'=' * 70}")
+            print("APPLYING FILTERS TO VALIDATION SET")
+            print(f"{'=' * 70}")
+
+            original_eval_size = len(eval_dataset)
+
+            # Determine paths for validation filtering
+            val_cartography_dir = (
+                args.validation_cartography_output_dir
+                if args.validation_cartography_output_dir
+                else args.cartography_output_dir
+            )
+            val_cluster_path = (
+                args.validation_cluster_assignments_path
+                if args.validation_cluster_assignments_path
+                else args.cluster_assignments_path
+            )
+
+            # Build filter config for validation
+            val_filter_config = {}
+
+            if args.filter_cartography:
+                val_filter_config["ambiguous"] = {
+                    "enabled": True,
+                    "metrics_path": val_cartography_dir,
+                    "top_fraction": 0.33,
+                    "apply_rule_based_filter": False,
+                }
+                print(f"  Cartography metrics from: {val_cartography_dir}")
+
+            if args.filter_clusters:
+                exclude_clusters = []
+                if args.exclude_clusters.strip():
+                    exclude_clusters = [
+                        int(c.strip()) for c in args.exclude_clusters.split(",")
+                    ]
+
+                val_filter_config["cluster"] = {
+                    "enabled": True,
+                    "cluster_path": val_cluster_path,
+                    "exclude_clusters": exclude_clusters,
+                    "min_probability": args.min_cluster_probability,
+                }
+                print(f"  Cluster assignments from: {val_cluster_path}")
+
+            # Apply filters to validation set
+            if val_filter_config:
+                eval_dataset = apply_filters(eval_dataset, val_filter_config)
+
+                filtered_eval_size = len(eval_dataset)
+                removed_eval_count = original_eval_size - filtered_eval_size
+
+                print("\nValidation Filtering Summary:")
+                print(f"  Original size: {original_eval_size}")
+                print(f"  Filtered size: {filtered_eval_size}")
+                print(
+                    f"  Removed: {removed_eval_count} examples ({removed_eval_count / original_eval_size * 100:.1f}%)"
+                )
+            print(f"{'=' * 70}\n")
+
         eval_dataset_featurized = eval_dataset.map(
             prepare_eval_dataset,
             batched=True,
