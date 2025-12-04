@@ -117,40 +117,6 @@ def compute_metrics(eval_preds: EvalPrediction):
     )
 
 
-# Attempt 2:
-# >>> Question-only ablation: randomize contexts & add filler if needed <<<
-# import random
-
-
-# def randomize_contexts_by_cyclic_shift(contexts, filler_words, seed: int = 42):
-#     n = len(contexts)
-#     rng = random.Random(seed)
-
-#     indices = list(range(n))
-#     rng.shuffle(indices)  # random permutation: i -> indices[i]
-
-#     new_contexts = []
-#     for i in range(n):
-#         original = contexts[i]
-#         target_len = len(original)
-#         src = contexts[indices[i]]
-
-#         ctx = src
-#         if len(ctx) < target_len:
-#             while len(ctx) < target_len:
-#                 filler = rng.choice(filler_words)
-#                 if ctx:
-#                     ctx += " "
-#                 ctx += filler
-#             ctx = ctx[:target_len]
-#         elif len(ctx) > target_len:
-#             ctx = ctx[:target_len]
-
-#         new_contexts.append(ctx)
-
-#     return new_contexts
-
-
 # This function preprocesses a question answering dataset, tokenizing the question and context text
 # and finding the right offsets for the answer spans in the tokenized context (to use as labels).
 # Adapted from https://github.com/huggingface/transformers/blob/master/examples/pytorch/question-answering/run_qa.py
@@ -171,14 +137,6 @@ def prepare_train_dataset_qa(
     if ablations == "p_only":
         # generic question template so model doesn't find value in this
         questions = ["What is the answer?" for _ in questions]
-
-    # comment out the question only type implementation to use
-    # # >>> NEW: randomized-context variant for q_only! <<<
-    # if ablations == "q_only":
-    #     # replace each context with another record's context,
-    #     # keeping the same length via pad/truncate
-    #     contexts = randomize_contexts_by_cyclic_shift(contexts, FILLER_WORDS, seed=42)
-    #     # NOTE: we are *not* changing answers here
 
     tokenized_examples = tokenizer(
         questions,

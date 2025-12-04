@@ -75,7 +75,6 @@ def main():
         default=None,
         help="Limit the number of examples to evaluate on.",
     )
-    #! Needs to be refactored and reworked.
     argp.add_argument(
         "--ablations",
         type=str,
@@ -521,9 +520,9 @@ def main():
         print("Training dynamics will be tracked across epochs.")
         print(f"{'=' * 70}\n")
 
-    # TODO: Why are we doing this?
     # This function wraps the compute_metrics function, storing the model's predictions
     # so that they can be dumped along with the computed metrics
+    # Not the best way, creates hidden state decoupling between wrapper and the outer function.
     eval_predictions = None
 
     def compute_metrics_and_store_predictions(eval_preds):
