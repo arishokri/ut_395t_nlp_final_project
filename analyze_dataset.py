@@ -31,6 +31,8 @@ from dataset_cartography import (
     get_examples_by_category,
     load_cartography_metrics,
 )
+from cluster_analysis import load_cluster_assignments
+from rule_based_errors import apply_rules_to_dataset
 from helpers import generate_hash_ids
 
 
@@ -574,6 +576,296 @@ def create_integrated_visualizations(merged_df: pd.DataFrame, output_dir: str):
     plt.close()
 
 
+def export_unified_analysis(
+    cartography_dir: str,
+    cluster_dir: str,
+    dataset_name: str,
+    split: str,
+    output_dir: str,
+    include_rules: bool = True,
+):
+    """
+    Export a unified CSV combining cartography, clustering, and rule-based analysis.
+
+    Parameters:
+    -----------
+    cartography_dir : str
+        Directory containing cartography metrics
+    cluster_dir : str
+        Directory containing cluster assignments
+    dataset_name : str
+        Dataset name to load original examples
+    split : str
+        Dataset split to use
+    output_dir : str
+        Directory to save outputs
+    include_rules : bool
+        Whether to include rule-based error detection (default: True)
+
+    Returns:
+    --------
+    pd.DataFrame : The unified analysis dataframe
+    """
+    print("=" * 70)
+    print("UNIFIED ANALYSIS EXPORT")
+    print("=" * 70)
+
+    # Load cartography metrics
+    print(f"\n1. Loading cartography metrics from {cartography_dir}...")
+    cartography_df = load_cartography_metrics(cartography_dir)
+    cartography_df = categorize_examples(cartography_df)
+    cartography_df = cartography_df.reset_index()  # Make id a column
+    cartography_df = cartography_df.rename(columns={"example_id": "id"})  # Rename to match dataset
+    print(f"   Loaded metrics for {len(cartography_df)} examples")
+
+    # Load cluster assignments
+    print(f"\n2. Loading cluster assignments from {cluster_dir}...")
+    cluster_df = load_cluster_assignments(cluster_dir)
+    cluster_df = cluster_df.reset_index()  # Make id a column
+    print(f"   Loaded {len(cluster_df)} cluster assignments")
+
+    # Load original dataset
+    print(f"\n3. Loading original dataset: {dataset_name}...")
+    if dataset_name.endswith(".json") or dataset_name.endswith(".jsonl"):
+        dataset = datasets.load_dataset("json", data_files=dataset_name)
+        dataset_split = dataset["train"]
+    else:
+        dataset = datasets.load_dataset(dataset_name)
+        dataset_split = dataset[split]
+
+    dataset_df = pd.DataFrame(dataset_split)
+
+    # Generate IDs if missing
+    if "id" not in dataset_df.columns:
+        print("   Generating IDs for dataset examples...")
+        dataset_with_ids = dataset_split.map(generate_hash_ids)
+        dataset_df = pd.DataFrame(dataset_with_ids)
+
+    print(f"   Loaded {len(dataset_df)} examples")
+
+    # Start with dataset as base
+    unified_df = dataset_df.copy()
+
+    # Merge cartography metrics
+    print("\n4. Merging cartography metrics...")
+    unified_df = unified_df.merge(
+        cartography_df, on="id", how="left", suffixes=("", "_cart")
+    )
+    cart_merged = unified_df["category"].notna().sum()
+    print(f"   Merged {cart_merged} examples with cartography data")
+
+    # Merge cluster assignments
+    print("\n5. Merging cluster assignments...")
+    unified_df = unified_df.merge(
+        cluster_df, on="id", how="left", suffixes=("", "_cluster")
+    )
+    cluster_merged = unified_df["cluster"].notna().sum()
+    print(f"   Merged {cluster_merged} examples with cluster data")
+
+    # Apply rule-based error detection
+    if include_rules:
+        print("\n6. Applying rule-based error detection...")
+        rule_df = apply_rules_to_dataset(dataset_df)
+        unified_df = unified_df.merge(rule_df, on="id", how="left")
+        rule_cols = [c for c in rule_df.columns if c.startswith("rule")]
+        print(f"   Added {len(rule_cols)} rule-based error flags")
+
+    # Save unified export
+    output_file = os.path.join(output_dir, "unified_analysis.csv")
+    print(f"\n7. Saving unified analysis to {output_file}...")
+    unified_df.to_csv(output_file, index=False)
+    print(f"   Saved {len(unified_df)} examples with {len(unified_df.columns)} columns")
+
+    # Create summary statistics
+    print("\n8. Computing summary statistics...")
+    summary_stats = compute_overlap_statistics(unified_df, include_rules)
+
+    summary_file = os.path.join(output_dir, "overlap_summary.json")
+    with open(summary_file, "w") as f:
+        json.dump(summary_stats, f, indent=2, default=str)
+    print(f"   Saved summary statistics to {summary_file}")
+
+    # Print key statistics
+    print("\n" + "=" * 70)
+    print("SUMMARY STATISTICS")
+    print("=" * 70)
+    print(f"\nTotal examples: {len(unified_df)}")
+    print(
+        f"With cartography data: {cart_merged} ({100 * cart_merged / len(unified_df):.1f}%)"
+    )
+    print(
+        f"With cluster data: {cluster_merged} ({100 * cluster_merged / len(unified_df):.1f}%)"
+    )
+
+    if "category" in unified_df.columns:
+        print("\nCartography category distribution:")
+        cat_counts = unified_df["category"].value_counts()
+        for cat, count in cat_counts.items():
+            print(f"  - {cat:12s}: {count:6d} ({100 * count / cart_merged:.1f}%)")
+
+    if "cluster" in unified_df.columns:
+        n_clusters = unified_df["cluster"].nunique() - (
+            1 if -1 in unified_df["cluster"].values else 0
+        )
+        n_noise = (unified_df["cluster"] == -1).sum()
+        print(f"\nClusters found: {n_clusters}")
+        print(f"Noise examples: {n_noise} ({100 * n_noise / cluster_merged:.1f}%)")
+
+    if include_rules and "dataset_error_score" in unified_df.columns:
+        print("\nRule-based error detection:")
+        error_count = unified_df["is_dataset_error"].sum()
+        print(
+            f"  Flagged as errors: {error_count} ({100 * error_count / len(unified_df):.1f}%)"
+        )
+        print(f"  Mean error score: {unified_df['dataset_error_score'].mean():.2f}")
+
+    print("\n" + "=" * 70)
+    print("UNIFIED EXPORT COMPLETE")
+    print("=" * 70)
+    print(f"\nOutputs saved to: {output_dir}")
+    print(f"- Unified analysis: {output_file}")
+    print(f"- Summary statistics: {summary_file}")
+    print("=" * 70 + "\n")
+
+    return unified_df
+
+
+def compute_overlap_statistics(unified_df: pd.DataFrame, include_rules: bool = True):
+    """Compute detailed overlap statistics between different analysis dimensions."""
+
+    stats = {
+        "total_examples": int(len(unified_df)),
+        "data_coverage": {},
+        "category_cluster_overlap": {},
+        "rule_overlap": {},
+        "high_overlap_regions": [],
+    }
+
+    # Data coverage
+    if "category" in unified_df.columns:
+        stats["data_coverage"]["cartography"] = int(
+            unified_df["category"].notna().sum()
+        )
+    if "cluster" in unified_df.columns:
+        stats["data_coverage"]["clustering"] = int(unified_df["cluster"].notna().sum())
+
+    # Category-cluster overlap
+    if "category" in unified_df.columns and "cluster" in unified_df.columns:
+        overlap_df = unified_df[
+            unified_df["category"].notna() & unified_df["cluster"].notna()
+        ]
+
+        # Distribution by category and cluster
+        for category in ["easy", "hard", "ambiguous"]:
+            cat_data = overlap_df[overlap_df["category"] == category]
+            if len(cat_data) > 0:
+                cluster_dist = cat_data["cluster"].value_counts().to_dict()
+                stats["category_cluster_overlap"][category] = {
+                    "total": int(len(cat_data)),
+                    "cluster_distribution": {
+                        int(k): int(v) for k, v in cluster_dist.items()
+                    },
+                }
+
+    # Rule-based overlap
+    if include_rules and "dataset_error_score" in unified_df.columns:
+        rule_cols = [
+            c
+            for c in unified_df.columns
+            if c.startswith("rule")
+            and c not in ["dataset_error_score", "is_dataset_error"]
+        ]
+
+        # Overall rule statistics
+        stats["rule_overlap"]["total_flagged"] = int(
+            unified_df["is_dataset_error"].sum()
+        )
+        stats["rule_overlap"]["mean_score"] = float(
+            unified_df["dataset_error_score"].mean()
+        )
+
+        # Rule triggers by category
+        if "category" in unified_df.columns:
+            stats["rule_overlap"]["by_category"] = {}
+            for category in ["easy", "hard", "ambiguous"]:
+                cat_data = unified_df[unified_df["category"] == category]
+                if len(cat_data) > 0:
+                    stats["rule_overlap"]["by_category"][category] = {
+                        "flagged_count": int(cat_data["is_dataset_error"].sum()),
+                        "flagged_percent": float(
+                            100 * cat_data["is_dataset_error"].mean()
+                        ),
+                        "mean_score": float(cat_data["dataset_error_score"].mean()),
+                    }
+
+        # Rule triggers by cluster
+        if "cluster" in unified_df.columns:
+            stats["rule_overlap"]["by_cluster"] = {}
+            cluster_groups = unified_df.groupby("cluster")
+            for cluster_id, group in cluster_groups:
+                if (
+                    cluster_id != -1 and len(group) >= 10
+                ):  # Skip noise and small clusters
+                    stats["rule_overlap"]["by_cluster"][int(cluster_id)] = {
+                        "flagged_count": int(group["is_dataset_error"].sum()),
+                        "flagged_percent": float(
+                            100 * group["is_dataset_error"].mean()
+                        ),
+                        "mean_score": float(group["dataset_error_score"].mean()),
+                    }
+
+        # Individual rule statistics
+        stats["rule_overlap"]["individual_rules"] = {}
+        for rule_col in rule_cols:
+            triggered = unified_df[rule_col].sum()
+            stats["rule_overlap"]["individual_rules"][rule_col] = {
+                "triggered_count": int(triggered),
+                "triggered_percent": float(100 * triggered / len(unified_df)),
+            }
+
+    # Identify high overlap regions (problematic areas)
+    if all(
+        c in unified_df.columns for c in ["category", "cluster", "is_dataset_error"]
+    ):
+        # Find category + cluster combinations with high error rates
+        overlap_df = unified_df[
+            unified_df["category"].notna() & unified_df["cluster"].notna()
+        ]
+
+        if len(overlap_df) > 0:
+            grouped = (
+                overlap_df.groupby(["category", "cluster"])
+                .agg({"is_dataset_error": ["sum", "mean", "count"]})
+                .reset_index()
+            )
+
+            grouped.columns = [
+                "category",
+                "cluster",
+                "error_count",
+                "error_rate",
+                "total_count",
+            ]
+
+            # Filter for significant groups (at least 10 examples, error rate > 30%)
+            significant = grouped[
+                (grouped["total_count"] >= 10) & (grouped["error_rate"] > 0.3)
+            ].sort_values("error_rate", ascending=False)
+
+            for _, row in significant.head(10).iterrows():
+                stats["high_overlap_regions"].append(
+                    {
+                        "category": row["category"],
+                        "cluster": int(row["cluster"]),
+                        "total_examples": int(row["total_count"]),
+                        "error_count": int(row["error_count"]),
+                        "error_rate": float(row["error_rate"]),
+                    }
+                )
+
+    return stats
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Unified dataset analysis (cartography and/or clustering)"
@@ -614,6 +906,16 @@ def main():
         default="./full_analysis_output",
         help="Directory to save analysis outputs",
     )
+    parser.add_argument(
+        "--export_unified",
+        action="store_true",
+        help="Export unified CSV combining cartography, clustering, and rule-based analysis",
+    )
+    parser.add_argument(
+        "--no_rules",
+        action="store_true",
+        help="Exclude rule-based error detection from unified export",
+    )
 
     args = parser.parse_args()
     os.makedirs(args.output_dir, exist_ok=True)
@@ -624,6 +926,24 @@ def main():
 
     if not has_cartography and not has_clustering:
         print("Error: Must specify at least one of --cartography_dir or --cluster_dir")
+        return
+
+    # Handle unified export request
+    if args.export_unified:
+        if not (has_cartography and has_clustering):
+            print(
+                "Error: --export_unified requires both --cartography_dir and --cluster_dir"
+            )
+            return
+
+        export_unified_analysis(
+            cartography_dir=args.cartography_dir,
+            cluster_dir=args.cluster_dir,
+            dataset_name=args.dataset,
+            split=args.split,
+            output_dir=args.output_dir,
+            include_rules=not args.no_rules,
+        )
         return
 
     if has_cartography and has_clustering:

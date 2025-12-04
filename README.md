@@ -245,6 +245,168 @@ Run example scripts:
 python examples/filtering_examples.py
 ```
 
+## Unified Analysis Export
+
+The unified analysis export combines results from cartography, clustering, and rule-based error detection into a single comprehensive CSV file for cross-method analysis. This enables:
+
+- Identifying high-overlap regions where multiple methods flag problems
+- Finding systematic dataset annotation errors
+- Prioritizing examples for manual review
+- Understanding agreement/disagreement between detection methods
+
+### Quick Start
+
+First, ensure you have all three analysis results:
+
+```bash
+# 1. Train with cartography
+python run.py \
+  --do_train \
+  --num_train_epochs 5 \
+  --enable_cartography \
+  --cartography_output_dir ./cartography_output \
+  --output_dir ./model
+
+# 2. Extract embeddings and cluster
+python extract_embeddings.py \
+  --model_path ./model \
+  --output_dir ./embeddings_output
+
+python cluster_analysis.py \
+  --embedding_dir ./embeddings_output \
+  --output_dir ./cluster_output
+
+# 3. Export unified analysis
+python analyze_dataset.py \
+  --cartography_dir ./cartography_output \
+  --cluster_dir ./cluster_output \
+  --export_unified \
+  --output_dir ./unified_export
+```
+
+### Outputs
+
+The export creates two files:
+
+1. **`unified_analysis.csv`** - Complete dataset with all metrics:
+
+   - Original columns (question, context, answer)
+   - Cartography metrics (confidence, variability, correctness, category)
+   - Cluster assignments (cluster ID, coordinates, probability)
+   - **Rule-based error flags** (one boolean column per rule)
+   - Error scores and classifications
+
+2. **`overlap_summary.json`** - Summary statistics:
+   - Data coverage by each method
+   - Category-cluster overlap distribution
+   - Rule trigger rates by category and cluster
+   - **High overlap regions** - areas flagged by multiple methods
+
+### Rule-Based Error Detection
+
+The unified export includes 9 rule-based error detection flags:
+
+- `rule1_length_anomaly` - Answer span is abnormally long
+- `rule2_multi_clause` - Answer contains multiple clauses
+- `rule3_low_q_similarity` - Low lexical overlap with question
+- `rule4_pred_inside_gold_better` - Prediction is better-aligned substring
+- `rule5_qtype_mismatch` - Question type vs answer structure mismatch
+- `rule6_multi_occurrences` - Answer appears multiple times in context
+- `rule7_boundary_weirdness` - Unusual start/end characters
+- `rule8_pred_better_q_alignment` - Prediction aligns better with question
+- `rule9_question_not_starting_with_qword` - Malformed question
+
+Each example gets a `dataset_error_score` (0-9) and `is_dataset_error` flag (score ≥ 3).
+
+### High Overlap Regions
+
+The system automatically identifies problematic regions where:
+
+- Cartography categorizes as hard/ambiguous
+- Clustering groups examples together
+- Rule-based detection flags errors
+
+Example from `overlap_summary.json`:
+
+```json
+{
+  "high_overlap_regions": [
+    {
+      "category": "ambiguous",
+      "cluster": 3,
+      "total_examples": 450,
+      "error_count": 180,
+      "error_rate": 0.4
+    }
+  ]
+}
+```
+
+This indicates 40% of ambiguous examples in cluster 3 are also flagged by rules - a systematic issue worth investigating.
+
+### Analysis Example
+
+```python
+import pandas as pd
+
+# Load unified analysis
+df = pd.read_csv("unified_export/unified_analysis.csv")
+
+# Find examples flagged by multiple methods
+problematic = df[
+    (df['category'] == 'ambiguous') &
+    (df['is_dataset_error'])
+]
+
+print(f"Found {len(problematic)} high-priority examples")
+
+# Export for manual review
+problematic[['id', 'question', 'answer', 'context']].to_csv('review.csv')
+```
+
+Run the comprehensive analysis example:
+
+```bash
+python demos/unified_analysis_example.py
+```
+
+This generates:
+
+- Error rate heatmaps by category and cluster
+- Scatter plots highlighting flagged examples
+- Rule trigger distribution charts
+- CSV files of problematic examples for review
+
+### Use Cases
+
+**Data Cleaning:**
+
+```python
+# Remove examples flagged by multiple methods
+clean_df = df[~((df['category'] == 'ambiguous') & df['is_dataset_error'])]
+```
+
+**Quality Metrics:**
+
+```python
+quality = {
+    'ambiguous_pct': 100 * (df['category'] == 'ambiguous').mean(),
+    'error_pct': 100 * df['is_dataset_error'].mean(),
+    'noise_pct': 100 * (df['cluster'] == -1).mean()
+}
+```
+
+**Prioritized Review:**
+
+```python
+# High-risk: ambiguous + noise cluster + errors
+high_risk = df[
+    (df['category'] == 'ambiguous') &
+    (df['cluster'] == -1) &
+    df['is_dataset_error']
+]
+```
+
 ## Version Controlling and Git Practices
 
 Make sure you add/install packages only using `uv add <package_name>` if you are using uv. Otherwise make sure you manually add them (in alphabetical order) to the `pyproject.toml` file.
