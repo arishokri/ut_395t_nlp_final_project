@@ -235,7 +235,6 @@ cartography_output_full/
 
 # Example Files/Directories
 cartography_output_other/
-*example*
 **OLD**
 notebooks/*.json
 extra_guides/

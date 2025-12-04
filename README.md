@@ -1,3 +1,30 @@
+## Experiment System
+
+A systematic framework for running and analyzing multiple training experiments with different configurations. Supports cartography filtering, cluster filtering, label smoothing, soft weighting, and combinations of these strategies.
+
+**Quick Start:**
+
+```bash
+# 1. Generate cartography metrics (one-time)
+python run.py --do_train --do_eval --enable_cartography \
+    --max_train_samples 10000 --num_train_epochs 3
+
+# 2. Run experiment suite
+python run_experiments.py --mode run --suite sample --max-train-samples 10000
+
+# 3. Analyze results
+python run_experiments.py --mode analyze
+```
+
+- `example_configs/` - Example configurations
+
+**Features:**
+
+- Automated execution of multiple experiments with tracking
+- Reproducible experiments with seeding support
+- Comprehensive result analysis with metrics, plots, and CSV export
+- Support for statistical testing with multiple seeds
+
 ## Training and evaluating a model
 
 ### General

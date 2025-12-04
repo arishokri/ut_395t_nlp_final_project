@@ -1,0 +1,56 @@
+{
+    "name": "label_smoothing_example",
+    "description": "Training with variability-based label smoothing (factor=0.6)",
+    "training": {
+        "model": "google/electra-small-discriminator",
+        "dataset": "Eladio/emrqa-msquad",
+        "max_length": 512,
+        "max_train_samples": 10000,
+        "max_eval_samples": 2000,
+        "per_device_train_batch_size": 8,
+        "per_device_eval_batch_size": 8,
+        "num_train_epochs": 3.0,
+        "learning_rate": 5e-05,
+        "weight_decay": 0.0,
+        "warmup_steps": 0,
+        "seed": 42,
+        "eval_steps": 500,
+        "save_steps": 500,
+        "logging_steps": 100,
+        "evaluation_strategy": "steps",
+        "save_strategy": "steps",
+        "save_total_limit": 2,
+        "load_best_model_at_end": true,
+        "metric_for_best_model": "eval_f1",
+        "ablations": "none",
+        "cartography_filter": {
+            "enabled": false,
+            "cartography_output_dir": "./cartography_output",
+            "top_fraction": 0.33,
+            "apply_rule_based_filter": false
+        },
+        "cluster_filter": {
+            "enabled": false,
+            "cluster_assignments_path": null,
+            "exclude_clusters": [
+                -1
+            ],
+            "min_cluster_probability": null
+        },
+        "label_smoothing": {
+            "enabled": true,
+            "cartography_output_dir": "./cartography_output",
+            "smoothing_factor": 0.6
+        },
+        "soft_weighting": {
+            "enabled": false,
+            "cartography_output_dir": "./cartography_output",
+            "weight_clip_min": 0.1,
+            "weight_clip_max": 10.0
+        },
+        "enable_cartography": false,
+        "cartography_output_dir": "./cartography_output",
+        "filter_validation_set": false
+    },
+    "output_dir": "./experiments"
+}
