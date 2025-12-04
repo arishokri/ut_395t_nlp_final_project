@@ -454,6 +454,9 @@ def analyze_clusters(
                 {
                     "id": row["id"],
                     "question": row["question"],
+                    "answer": row.get("answers", {}).get("text", [None])[0]
+                    if isinstance(row.get("answers"), dict)
+                    else row.get("answers"),
                     "context": row["context"][:200] + "..."
                     if len(row["context"]) > 200
                     else row["context"],
@@ -468,6 +471,9 @@ def analyze_clusters(
             {
                 "id": row["id"],
                 "question": row["question"],
+                "answer": row.get("answers", {}).get("text", [None])[0]
+                if isinstance(row.get("answers"), dict)
+                else row.get("answers"),
                 "context": row["context"][:200] + "..."
                 if len(row["context"]) > 200
                 else row["context"],
