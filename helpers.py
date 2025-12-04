@@ -223,7 +223,10 @@ def prepare_train_dataset_qa(
 
     tokenized_examples["start_positions"] = []
     tokenized_examples["end_positions"] = []
-    tokenized_examples["example_id"] = []  # Track example IDs for cartography
+    # Create 'example_id' field from dataset's 'id' column for cartography tracking.
+    # This custom field is extracted by DataCollatorWithExampleId during training
+    # to track per-example dynamics in DatasetCartographyCallback.
+    tokenized_examples["example_id"] = []
 
     for i, offsets in enumerate(offset_mapping):
         input_ids = tokenized_examples["input_ids"][i]
@@ -460,7 +463,6 @@ class QuestionAnsweringTrainer(Trainer):
             for cb in self.callback_handler.callbacks
         )
 
-        # TODO: Why are we using "example_id" column? Is this separate from "id"?
         if has_cartography and "example_id" in dataset.column_names:
             # Don't remove example_id column when cartography is enabled
             # We'll handle it in the data collator
