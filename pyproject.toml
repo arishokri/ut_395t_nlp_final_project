@@ -12,6 +12,7 @@ dependencies = [
     "ipywidgets>=8.1.8",
     "matplotlib>=3.10.7",
     "nbstripout>=0.8.2",
+    "pytest>=9.0.1",
     "scikit-learn>=1.6.1",
     "sentence-transformers>=5.1.2",
     "torch>=2.9.0",
@@ -19,6 +20,18 @@ dependencies = [
     "transformers>=4.57.1",
     "umap-learn>=0.5.9.post2",
     "wandb>=0.18.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = ["-v", "--strict-markers", "--tb=short", "--disable-warnings"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
 ]
 
 [tool.ruff.lint]
