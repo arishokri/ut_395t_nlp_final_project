@@ -149,7 +149,7 @@ Examples:
     parser.add_argument(
         "--suite",
         type=str,
-        choices=["sample", "minimal", "filtering", "weighting"],
+        choices=["sample", "minimal", "filtering", "weighting", "overnight"],
         help="Experiment suite to run (for --mode run)",
     )
 
@@ -201,6 +201,13 @@ Examples:
         nargs="+",
         default=[42],
         help="Random seeds for replication (default: 42)",
+    )
+
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=8,
+        help="Per-device training batch size (default: 8)",
     )
 
     parser.add_argument(
@@ -353,6 +360,175 @@ Examples:
             ]
             print(
                 f"\n[INFO] Created {len(experiments)} experiments from weighting suite"
+            )
+
+        elif args.suite == "overnight":
+            # Overnight suite: comprehensive parameter sweep
+            from experiment_config import (
+                TrainingConfig,
+                CartographyFilterConfig,
+                ClusterFilterConfig,
+                LabelSmoothingConfig,
+                SoftWeightingConfig,
+                ExperimentConfig,
+            )
+
+            experiments = []
+
+            # Common training config settings
+            common_config = {
+                "max_train_samples": args.max_train_samples,
+                "max_eval_samples": args.max_eval_samples,
+                "per_device_train_batch_size": args.batch_size,
+                "per_device_eval_batch_size": args.batch_size,
+                "save_strategy": "no",  # Disable intermediate checkpoints
+            }
+
+            for seed in args.seeds:
+                # 1. Baseline
+                experiments.append(
+                    ExperimentConfig(
+                        name=f"baseline_seed{seed}",
+                        description="Baseline with no filtering or strategies",
+                        training=TrainingConfig(seed=seed, **common_config),
+                    )
+                )
+
+                # 2. Cartography filtering - sweep top_fraction
+                for fraction in [0.25, 0.33, 0.50, 0.67]:
+                    experiments.append(
+                        ExperimentConfig(
+                            name=f"cart_filter_{int(fraction * 100)}_seed{seed}",
+                            description=f"Cartography filter top {fraction:.0%} + validation filtering",
+                            training=TrainingConfig(
+                                seed=seed,
+                                cartography_filter=CartographyFilterConfig(
+                                    enabled=True,
+                                    cartography_output_dir=args.cartography_dir,
+                                    top_fraction=fraction,
+                                ),
+                                filter_validation_set=True,
+                                validation_cartography_output_dir=args.validation_cartography_dir,
+                                **common_config,
+                            ),
+                        )
+                    )
+
+                # 3. Cluster filtering - different exclude strategies
+                for exclude in [[-1], [-1, 0], [-1, 1]]:
+                    exclude_str = "_".join(str(abs(x)) for x in exclude)
+                    experiments.append(
+                        ExperimentConfig(
+                            name=f"cluster_excl_{exclude_str}_seed{seed}",
+                            description=f"Cluster filter excluding {exclude} + validation filtering",
+                            training=TrainingConfig(
+                                seed=seed,
+                                cluster_filter=ClusterFilterConfig(
+                                    enabled=True,
+                                    cluster_assignments_path=args.cluster_dir,
+                                    exclude_clusters=exclude,
+                                ),
+                                filter_validation_set=True,
+                                validation_cluster_assignments_path="./cluster_output_validation",
+                                **common_config,
+                            ),
+                        )
+                    )
+
+                # 4. Label smoothing - sweep smoothing_factor
+                for factor in [0.3, 0.5, 0.7, 0.9]:
+                    experiments.append(
+                        ExperimentConfig(
+                            name=f"smooth_{int(factor * 10)}_seed{seed}",
+                            description=f"Label smoothing factor {factor}",
+                            training=TrainingConfig(
+                                seed=seed,
+                                label_smoothing=LabelSmoothingConfig(
+                                    enabled=True,
+                                    cartography_output_dir=args.cartography_dir,
+                                    smoothing_factor=factor,
+                                ),
+                                **common_config,
+                            ),
+                        )
+                    )
+
+                # 5. Soft weighting - sweep weight ranges
+                for clip_max in [5.0, 10.0, 20.0]:
+                    experiments.append(
+                        ExperimentConfig(
+                            name=f"weight_max{int(clip_max)}_seed{seed}",
+                            description=f"Soft weighting with max weight {clip_max}",
+                            training=TrainingConfig(
+                                seed=seed,
+                                soft_weighting=SoftWeightingConfig(
+                                    enabled=True,
+                                    cartography_output_dir=args.cartography_dir,
+                                    weight_clip_min=0.1,
+                                    weight_clip_max=clip_max,
+                                ),
+                                **common_config,
+                            ),
+                        )
+                    )
+
+                # 6. Combined: Cartography filtering + Label smoothing
+                experiments.append(
+                    ExperimentConfig(
+                        name=f"combined_cart_smooth_seed{seed}",
+                        description="Cartography filter + label smoothing",
+                        training=TrainingConfig(
+                            seed=seed,
+                            cartography_filter=CartographyFilterConfig(
+                                enabled=True,
+                                cartography_output_dir=args.cartography_dir,
+                                top_fraction=0.33,
+                            ),
+                            label_smoothing=LabelSmoothingConfig(
+                                enabled=True,
+                                cartography_output_dir=args.cartography_dir,
+                                smoothing_factor=0.6,
+                            ),
+                            filter_validation_set=True,
+                            validation_cartography_output_dir=args.validation_cartography_dir,
+                            **common_config,
+                        ),
+                    )
+                )
+
+                # 7. Combined: Cluster filtering + Soft weighting
+                experiments.append(
+                    ExperimentConfig(
+                        name=f"combined_cluster_weight_seed{seed}",
+                        description="Cluster filter + soft weighting",
+                        training=TrainingConfig(
+                            seed=seed,
+                            cluster_filter=ClusterFilterConfig(
+                                enabled=True,
+                                cluster_assignments_path=args.cluster_dir,
+                                exclude_clusters=[-1],
+                            ),
+                            soft_weighting=SoftWeightingConfig(
+                                enabled=True,
+                                cartography_output_dir=args.cartography_dir,
+                                weight_clip_min=0.1,
+                                weight_clip_max=10.0,
+                            ),
+                            filter_validation_set=True,
+                            validation_cluster_assignments_path="./cluster_output_validation",
+                            **common_config,
+                        ),
+                    )
+                )
+
+            print(
+                f"\n[INFO] Created {len(experiments)} experiments from overnight suite"
+            )
+            print(f"[INFO] Experiments per seed: {len(experiments) // len(args.seeds)}")
+            print(f"[INFO] Seeds: {args.seeds}")
+            print(f"[INFO] Batch size: {args.batch_size}")
+            print(
+                "[INFO] Checkpoint saving: MINIMAL (save_strategy=no, save_total_limit=1)"
             )
 
         elif args.configs:

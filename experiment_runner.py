@@ -250,7 +250,13 @@ class ExperimentRunner:
                 # Print key metrics
                 f1 = result.metrics.get("eval_f1", "N/A")
                 exact_match = result.metrics.get("eval_exact_match", "N/A")
-                print(f"F1={f1:.4f} EM={exact_match:.4f}")
+                # Handle both numeric and string values
+                if isinstance(f1, (int, float)) and isinstance(
+                    exact_match, (int, float)
+                ):
+                    print(f"F1={f1:.4f} EM={exact_match:.4f}")
+                else:
+                    print(f"F1={f1} EM={exact_match}")
             else:
                 print(f"ERROR: {result.error}")
 
