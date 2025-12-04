@@ -329,6 +329,70 @@ def load_cartography_metrics(output_dir: str = "./cartography_output") -> pd.Dat
     return df
 
 
+def load_variability_map(
+    cartography_dir: str,
+    mode: str = "smoothing",
+    smoothing_factor: float = 0.6,
+    weight_clip_range: tuple = (0.1, 10.0),
+) -> dict:
+    """
+    Load variability scores from cartography metrics for label smoothing or loss weighting.
+
+    Supports two modes:
+    - 'smoothing': Converts variability to label smoothing factors (0.0-0.3 range)
+    - 'weighting': Converts variability to loss weights (1.0+ range, clipped)
+
+    Args:
+        cartography_dir: Directory containing cartography_metrics.csv
+        mode: Either 'smoothing' or 'weighting'
+        smoothing_factor: For mode='smoothing', multiplier to convert variability
+                         to smoothing amount (default: 0.6)
+        weight_clip_range: For mode='weighting', (min, max) range to clip weights
+                          (default: (0.1, 10.0))
+
+    Returns:
+        Dictionary mapping example_id (str) -> value (float)
+        - For 'smoothing': value is smoothing amount in [0.0, 0.3]
+        - For 'weighting': value is loss weight in [clip_min, clip_max]
+
+    Example:
+        # For label smoothing
+        smoothing_map = load_variability_map('./cartography_output', mode='smoothing')
+        smoothing = smoothing_map['abc123']  # Returns 0.15 for var=0.25
+
+        # For loss weighting
+        weight_map = load_variability_map('./cartography_output', mode='weighting')
+        weight = weight_map['abc123']  # Returns 1.25 for var=0.25
+    """
+    df = load_cartography_metrics(cartography_dir)
+
+    result_map = {}
+
+    if mode == "smoothing":
+        # Convert variability to smoothing factors
+        # Higher variability → more smoothing (softer targets)
+        for example_id, row in df.iterrows():
+            variability = row["variability"]
+            # Typical variability range: 0.0 - 0.4
+            # Desired smoothing range: 0.0 - 0.3
+            smoothing = min(0.3, variability * smoothing_factor)
+            result_map[example_id] = float(smoothing)
+
+    elif mode == "weighting":
+        # Convert variability to loss weights
+        # Higher variability → higher weight (focus more on hard examples)
+        for example_id, row in df.iterrows():
+            variability = row["variability"]
+            raw_weight = 1.0 + variability  # Range: [1.0, ~2.5] for typical variability
+            # Clip to prevent extreme weights
+            weight = max(weight_clip_range[0], min(weight_clip_range[1], raw_weight))
+            result_map[example_id] = float(weight)
+    else:
+        raise ValueError(f"Invalid mode '{mode}'. Must be 'smoothing' or 'weighting'.")
+
+    return result_map
+
+
 def categorize_examples(
     df: pd.DataFrame,
     conf_threshold: Optional[float] = None,

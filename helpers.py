@@ -5,6 +5,8 @@ from typing import Tuple
 
 import evaluate
 import numpy as np
+import torch
+import torch.nn.functional as F
 from tqdm.auto import tqdm
 from transformers import DefaultDataCollator, EvalPrediction, Trainer
 
@@ -435,9 +437,18 @@ def postprocess_qa_predictions(
 
 # Adapted from https://github.com/huggingface/transformers/blob/master/examples/pytorch/question-answering/trainer_qa.py
 class QuestionAnsweringTrainer(Trainer):
-    def __init__(self, *args, eval_examples=None, **kwargs):
+    def __init__(
+        self,
+        *args,
+        eval_examples=None,
+        smoothing_map=None,
+        weighting_map=None,
+        **kwargs,
+    ):
         super().__init__(*args, **kwargs)
         self.eval_examples = eval_examples
+        self.smoothing_map = smoothing_map  # For label smoothing
+        self.weighting_map = weighting_map  # For soft weighting
 
     def _remove_unused_columns(self, dataset, description=None):
         """Override to preserve example_id for cartography tracking."""
@@ -466,18 +477,140 @@ class QuestionAnsweringTrainer(Trainer):
 
         return super()._remove_unused_columns(dataset, description)
 
+    def label_smoothed_cross_entropy(
+        self,
+        logits: torch.Tensor,
+        targets: torch.Tensor,
+        smoothing_factors: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Compute cross-entropy loss with per-example label smoothing.
+
+        Standard cross-entropy uses hard targets (one-hot distribution).
+        Label smoothing redistributes probability mass to create soft targets,
+        reducing model overconfidence on potentially noisy labels.
+
+        Args:
+            logits: [batch_size, seq_len] - model predictions (unnormalized)
+            targets: [batch_size] - ground truth position indices
+            smoothing_factors: [batch_size] - smoothing amount per example (0.0-0.3)
+
+        Returns:
+            Tensor of per-example losses [batch_size]
+        """
+        batch_size, num_classes = logits.shape
+
+        # Compute log probabilities for numerical stability
+        log_probs = F.log_softmax(logits, dim=-1)
+
+        # Create smoothed target distributions
+        with torch.no_grad():
+            # Start with uniform distribution (each position gets equal mass)
+            uniform_dist = torch.full_like(log_probs, 1.0 / num_classes)
+
+            # Create one-hot distribution for true positions
+            true_dist = torch.zeros_like(log_probs)
+            true_dist.scatter_(1, targets.unsqueeze(1), 1.0)
+
+            # Blend based on smoothing factor
+            # smoothing=0 → use true_dist (hard targets)
+            # smoothing=1 → use uniform_dist (maximum smoothing)
+            smoothing_factors = smoothing_factors.unsqueeze(1)  # [batch, 1]
+            target_dist = (
+                1.0 - smoothing_factors
+            ) * true_dist + smoothing_factors * uniform_dist
+
+        # Compute KL divergence between target distribution and predictions
+        # Equivalent to cross-entropy with soft targets
+        loss_per_example = -torch.sum(target_dist * log_probs, dim=-1)
+
+        return loss_per_example
+
+    def get_weight_for_example(self, example_id: str) -> float:
+        """
+        Get loss weight for a specific example based on variability.
+
+        Args:
+            example_id: The unique identifier for the example
+
+        Returns:
+            Weight value (typically 1.0-2.5, clipped to prevent extremes)
+        """
+        if self.weighting_map is None or example_id not in self.weighting_map:
+            return 1.0
+        return self.weighting_map[example_id]
+
     def compute_loss(
         self, model, inputs, return_outputs=False, num_items_in_batch=None
     ):
         """
-        Override compute_loss to track training dynamics for dataset cartography.
+        Override compute_loss to support label smoothing, soft weighting, and cartography tracking.
+
+        Features:
+        - Label smoothing: Applies per-example smoothing based on variability
+        - Soft weighting: Weights loss by variability (higher variability = higher weight)
+        - Cartography tracking: Records training dynamics for dataset analysis
+
+        Only smoothing and weighting are applied during training, not evaluation.
         """
         # Extract example_id before passing to model (model doesn't accept it)
         example_ids = inputs.pop("example_id", None)
 
-        # Get the original loss
+        # Get model outputs
         outputs = model(**inputs)
-        loss = outputs.loss
+
+        # Determine if we should apply custom loss (smoothing or weighting)
+        should_apply_custom_loss = (
+            (self.smoothing_map is not None or self.weighting_map is not None)
+            and example_ids is not None
+            and model.training  # Only during training, not evaluation
+        )
+
+        if should_apply_custom_loss:
+            # Extract logits and positions
+            start_logits = outputs.start_logits
+            end_logits = outputs.end_logits
+            start_positions = inputs["start_positions"]
+            end_positions = inputs["end_positions"]
+
+            # Compute per-example losses
+            if self.smoothing_map is not None:
+                # Use label smoothing
+                smoothing_factors = torch.tensor(
+                    [self.smoothing_map.get(eid, 0.0) for eid in example_ids],
+                    device=start_logits.device,
+                    dtype=torch.float32,
+                )
+
+                start_loss_per_example = self.label_smoothed_cross_entropy(
+                    start_logits, start_positions, smoothing_factors
+                )
+                end_loss_per_example = self.label_smoothed_cross_entropy(
+                    end_logits, end_positions, smoothing_factors
+                )
+            else:
+                # Use standard cross-entropy (no smoothing)
+                loss_fct = torch.nn.CrossEntropyLoss(reduction="none")
+                start_loss_per_example = loss_fct(start_logits, start_positions)
+                end_loss_per_example = loss_fct(end_logits, end_positions)
+
+            # Average start and end losses per example
+            per_example_loss = (start_loss_per_example + end_loss_per_example) / 2
+
+            # Apply weights if soft weighting is enabled
+            if self.weighting_map is not None:
+                weights = torch.tensor(
+                    [self.get_weight_for_example(eid) for eid in example_ids],
+                    device=per_example_loss.device,
+                    dtype=per_example_loss.dtype,
+                )
+                per_example_loss = per_example_loss * weights
+
+            # Reduce to scalar loss
+            loss = per_example_loss.mean()
+        else:
+            # Use default loss (evaluation or no custom loss enabled)
+            loss = outputs.loss
 
         # Track training dynamics if cartography is enabled
         # Find cartography callback from registered callbacks
