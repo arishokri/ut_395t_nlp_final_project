@@ -150,6 +150,12 @@ def main():
         default=10.0,
         help="Maximum weight value for soft weighting (default: 10.0).",
     )
+    argp.add_argument(
+        "--train_split",
+        type=str,
+        default="train",
+        help="Dataset split to use for training (default: 'train'). Use 'validation' to run cartography on validation data.",
+    )
 
     training_args, args = argp.parse_args_into_dataclasses()
 
@@ -212,7 +218,7 @@ def main():
     train_dataset_featurized = None
     eval_dataset_featurized = None
     if training_args.do_train:
-        train_dataset = dataset["train"]
+        train_dataset = dataset[args.train_split]
 
         if args.max_train_samples:
             train_dataset = train_dataset.select(range(args.max_train_samples))
