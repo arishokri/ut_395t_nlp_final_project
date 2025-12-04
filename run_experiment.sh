@@ -26,9 +26,11 @@ python3 run.py \
   --report_to wandb \
   --do_train \
   --do_eval \
-  --num_train_epochs 5 \
-  --per_device_train_batch_size 16 \
-  --evaluation_strategy epoch \
+  --num_train_epochs 3 \
+  --per_device_train_batch_size 64 \
+  --max_train_samples 5000 \
+  --max_eval_samples 1000 \
+  --eval_strategy epoch \
   --save_strategy epoch \
   --logging_steps 100 \
   --save_total_limit 2 \
