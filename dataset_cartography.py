@@ -83,7 +83,7 @@ class DatasetCartographyCallback(TrainerCallback):
 
         # Save as DataFrame for analysis
         df = pd.DataFrame.from_dict(metrics, orient="index")
-        df.index.name = "example_id"
+        df.index.name = "id"
         df_file = os.path.join(self.output_dir, "cartography_metrics.csv")
         df.to_csv(df_file)
 
@@ -101,7 +101,7 @@ class DatasetCartographyCallback(TrainerCallback):
         Compute cartography metrics for each example.
 
         Returns:
-            Dictionary mapping example_id to metrics:
+            Dictionary mapping id to metrics:
             - confidence: mean probability across epochs
             - variability: std dev of probabilities across epochs
             - correctness: fraction of correct predictions
@@ -325,7 +325,7 @@ def load_cartography_metrics(output_dir: str = "./cartography_output") -> pd.Dat
             "Make sure to run training with --enable_cartography flag first."
         )
 
-    df = pd.read_csv(metrics_file, index_col="example_id")
+    df = pd.read_csv(metrics_file, index_col="id")
     return df
 
 
@@ -351,7 +351,7 @@ def load_variability_map(
                           (default: (0.1, 10.0))
 
     Returns:
-        Dictionary mapping example_id (str) -> value (float)
+        Dictionary mapping id (str) -> value (float)
         - For 'smoothing': value is smoothing amount in [0.0, 0.3]
         - For 'weighting': value is loss weight in [clip_min, clip_max]
 
@@ -470,7 +470,7 @@ def analyze_cartography_by_question_type(
     Analyze cartography metrics by question type.
 
     Args:
-        cartography_df: DataFrame with cartography metrics (indexed by example_id)
+        cartography_df: DataFrame with cartography metrics (indexed by id)
         dataset_df: DataFrame with dataset examples including 'question' column
 
     Returns:

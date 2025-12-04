@@ -21,7 +21,7 @@ class TestLoadCartographyMetrics:
         assert "variability" in df.columns
         assert len(df) == 5
         # Index should be example_id
-        assert df.index.name == "example_id"
+        assert df.index.name == "id"
 
     def test_load_from_csv_file(self, sample_cartography_metrics):
         """Test loading metrics from CSV file path."""
@@ -39,7 +39,7 @@ class TestLoadCartographyMetrics:
         for col in required_cols:
             assert col in df.columns
         # example_id is the index
-        assert df.index.name == "example_id"
+        assert df.index.name == "id"
 
 
 class TestCategorizeExamples:

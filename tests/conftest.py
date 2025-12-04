@@ -53,7 +53,7 @@ def sample_qa_dataset():
 def sample_cartography_metrics(temp_dir):
     """Create sample cartography metrics CSV file."""
     metrics_data = {
-        "example_id": ["q1", "q2", "q3", "q4", "q5"],
+        "id": ["q1", "q2", "q3", "q4", "q5"],
         "confidence": [0.95, 0.85, 0.45, 0.92, 0.50],
         "variability": [0.05, 0.15, 0.55, 0.08, 0.50],
         "correctness": [1.0, 1.0, 0.4, 1.0, 0.6],

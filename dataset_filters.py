@@ -154,7 +154,7 @@ class AmbiguousQuestionFilter(DatasetFilter):
             return load_cartography_metrics(self.metrics_path)
         elif os.path.isfile(self.metrics_path):
             # Load CSV directly
-            return pd.read_csv(self.metrics_path, index_col="example_id")
+            return pd.read_csv(self.metrics_path, index_col="id")
         else:
             raise FileNotFoundError(
                 f"Cartography metrics not found: {self.metrics_path}"

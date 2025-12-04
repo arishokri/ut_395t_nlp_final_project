@@ -615,7 +615,6 @@ def export_unified_analysis(
     cartography_df = load_cartography_metrics(cartography_dir)
     cartography_df = categorize_examples(cartography_df)
     cartography_df = cartography_df.reset_index()  # Make id a column
-    cartography_df = cartography_df.rename(columns={"example_id": "id"})  # Rename to match dataset
     print(f"   Loaded metrics for {len(cartography_df)} examples")
 
     # Load cluster assignments
