@@ -92,18 +92,12 @@ def main():
         "--cartography_output_dir",
         type=str,
         default="./cartography_output",
-        help="Directory to save cartography outputs.",
+        help="Directory for cartography outputs. Used for: saving training dynamics (--enable_cartography), filtering (--filter_cartography), label smoothing (--use_label_smoothing), and soft weighting (--use_soft_weighting).",
     )
     argp.add_argument(
         "--filter_cartography",
         action="store_true",
         help="Filter dataset based on cartography metrics (removes ambiguous examples).",
-    )
-    argp.add_argument(
-        "--cartography_metrics_path",
-        type=str,
-        default=None,
-        help="Path to existing cartography metrics. If not provided, filtering will be skipped.",
     )
     argp.add_argument(
         "--filter_clusters",
@@ -127,6 +121,34 @@ def main():
         type=float,
         default=None,
         help="Minimum cluster probability threshold for filtering (0.0-1.0).",
+    )
+    argp.add_argument(
+        "--use_label_smoothing",
+        action="store_true",
+        help="Enable variability-based label smoothing to reduce overfitting on ambiguous/noisy examples.",
+    )
+    argp.add_argument(
+        "--smoothing_factor",
+        type=float,
+        default=0.6,
+        help="Multiplier to convert variability to smoothing amount (default: 0.6). Higher = more aggressive smoothing.",
+    )
+    argp.add_argument(
+        "--use_soft_weighting",
+        action="store_true",
+        help="Enable soft weight schedule using variability from cartography metrics.",
+    )
+    argp.add_argument(
+        "--weight_clip_min",
+        type=float,
+        default=0.1,
+        help="Minimum weight value for soft weighting (default: 0.1).",
+    )
+    argp.add_argument(
+        "--weight_clip_max",
+        type=float,
+        default=10.0,
+        help="Maximum weight value for soft weighting (default: 10.0).",
     )
 
     training_args, args = argp.parse_args_into_dataclasses()
@@ -197,11 +219,10 @@ def main():
 
         # Apply cartography filtering if requested
         if args.filter_cartography:
-            cartography_output_dir = args.cartography_output_dir
             print(f"\n{'=' * 70}")
             print("APPLYING CARTOGRAPHY FILTERING")
             print(f"{'=' * 70}")
-            print(f"Using cartography metrics from: {cartography_output_dir}")
+            print(f"Using cartography metrics from: {args.cartography_output_dir}")
 
             original_size = len(train_dataset)
 
@@ -210,7 +231,7 @@ def main():
             filter_config = {
                 "ambiguous": {
                     "enabled": True,
-                    "metrics_path": cartography_output_dir,
+                    "metrics_path": args.cartography_output_dir,
                     "top_fraction": 0.33,
                     "apply_rule_based_filter": False,
                 }
@@ -326,8 +347,80 @@ def main():
         eval_predictions = eval_preds
         return compute_metrics(eval_preds)
 
-    # Create data collator that handles example_id for cartography
-    data_collator = DataCollatorWithExampleId() if args.enable_cartography else None
+    # Create data collator that handles example_id for cartography, label smoothing, or soft weighting
+    data_collator = (
+        DataCollatorWithExampleId()
+        if (
+            args.enable_cartography
+            or args.use_label_smoothing
+            or args.use_soft_weighting
+        )
+        else None
+    )
+
+    # Load variability maps for label smoothing and/or soft weighting
+    smoothing_map = None
+    weighting_map = None
+
+    if args.use_label_smoothing:
+        print(f"\n{'=' * 70}")
+        print("LABEL SMOOTHING ENABLED")
+        print(f"{'=' * 70}")
+        print(f"Loading variability metrics from: {args.cartography_output_dir}")
+
+        from dataset_cartography import load_variability_map
+
+        smoothing_map = load_variability_map(
+            args.cartography_output_dir,
+            mode="smoothing",
+            smoothing_factor=args.smoothing_factor,
+        )
+
+        print(f"Loaded smoothing factors for {len(smoothing_map)} examples")
+
+        # Print statistics
+        smoothing_values = list(smoothing_map.values())
+        print(
+            f"Smoothing range: [{min(smoothing_values):.4f}, {max(smoothing_values):.4f}]"
+        )
+        print(f"Mean smoothing: {sum(smoothing_values) / len(smoothing_values):.4f}")
+
+        # Show distribution
+        low_smooth = sum(1 for s in smoothing_values if s < 0.05)
+        med_smooth = sum(1 for s in smoothing_values if 0.05 <= s < 0.15)
+        high_smooth = sum(1 for s in smoothing_values if s >= 0.15)
+
+        print("\nSmoothing distribution:")
+        print(
+            f"  Low (<0.05):        {low_smooth:6d} ({100 * low_smooth / len(smoothing_values):5.1f}%)"
+        )
+        print(
+            f"  Medium (0.05-0.15): {med_smooth:6d} ({100 * med_smooth / len(smoothing_values):5.1f}%)"
+        )
+        print(
+            f"  High (≥0.15):       {high_smooth:6d} ({100 * high_smooth / len(smoothing_values):5.1f}%)"
+        )
+        print(f"{'=' * 70}\n")
+
+    if args.use_soft_weighting:
+        print(f"\n{'=' * 70}")
+        print("SOFT WEIGHT SCHEDULE ENABLED")
+        print(f"{'=' * 70}")
+        print(f"Loading variability metrics from: {args.cartography_output_dir}")
+
+        from dataset_cartography import load_variability_map
+
+        weighting_map = load_variability_map(
+            args.cartography_output_dir,
+            mode="weighting",
+            weight_clip_range=(args.weight_clip_min, args.weight_clip_max),
+        )
+
+        print(f"Loaded weights for {len(weighting_map)} examples")
+        weights_list = list(weighting_map.values())
+        print(f"Weight range: [{min(weights_list):.3f}, {max(weights_list):.3f}]")
+        print(f"Mean weight: {sum(weights_list) / len(weights_list):.3f}")
+        print(f"{'=' * 70}\n")
 
     # Initialize the Trainer object with the specified arguments and the model and dataset we loaded above
     trainer = QuestionAnsweringTrainer(
@@ -338,6 +431,8 @@ def main():
         processing_class=tokenizer,
         compute_metrics=compute_metrics_and_store_predictions,
         data_collator=data_collator,
+        smoothing_map=smoothing_map,
+        weighting_map=weighting_map,
         callbacks=[cartography_callback] if cartography_callback is not None else [],
         **trainer_kwargs,
     )

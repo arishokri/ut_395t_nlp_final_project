@@ -104,7 +104,7 @@ python run.py \
 Important Parameters:
 
 - `--enable_cartography`: Enables cartography tracking
-- `--cartography_output_dir`: Where to save cartography outputs (default: `./cartography_output`)
+- `--cartography_output_dir`: Directory for all cartography operations (default: `./cartography_output`)
 - `--num_train_epochs`: Should be ≥3 for meaningful statistics across epochs
 
 The callback will generate:
@@ -129,6 +129,84 @@ This generates:
 - **Question type analysis**: How different question types behave
 - **Category samples**: Example questions from each category
 - **Additional visualizations**: Distributions, correlations, breakdowns
+
+### Curriculum Learning with Cartography
+
+The cartography metrics enable two curriculum learning techniques to improve model training:
+
+#### 1. Variability-Based Label Smoothing
+
+Reduces overfitting on ambiguous/noisy examples by applying soft labels based on variability scores:
+
+```bash
+python run.py \
+  --do_train \
+  --use_label_smoothing \
+  --cartography_output_dir ./cartography_output \
+  --smoothing_factor 0.6
+```
+
+- `--use_label_smoothing`: Enable label smoothing based on variability
+- `--smoothing_factor`: Multiplier for variability→smoothing conversion (default: 0.6, range: 0.4-0.8)
+
+High variability examples get softer labels (reducing overconfidence on uncertain data), while low variability examples keep hard targets.
+
+#### 2. Soft Weight Schedule
+
+Increases focus on harder examples during training by weighting losses based on variability:
+
+```bash
+python run.py \
+  --do_train \
+  --use_soft_weighting \
+  --cartography_output_dir ./cartography_output \
+  --weight_clip_min 0.1 \
+  --weight_clip_max 10.0
+```
+
+- `--use_soft_weighting`: Enable variability-based loss weighting
+- `--weight_clip_min/max`: Clipping range for weights (default: 0.1-10.0)
+
+Higher variability examples receive higher loss weights, making the model focus more on difficult/ambiguous cases.
+
+#### Combined Training
+
+Both techniques can be used together:
+
+```bash
+python run.py \
+  --do_train \
+  --use_label_smoothing \
+  --use_soft_weighting \
+  --cartography_output_dir ./cartography_output \
+  --smoothing_factor 0.6 \
+  --weight_clip_min 0.1 \
+  --weight_clip_max 10.0
+```
+
+**Two-Stage Workflow:**
+
+1. Generate cartography metrics (5 epochs recommended)
+2. Train final model with curriculum learning enabled
+
+```bash
+# Stage 1: Generate metrics
+python run.py \
+  --do_train \
+  --num_train_epochs 5 \
+  --enable_cartography \
+  --cartography_output_dir ./cartography_output \
+  --output_dir ./initial_model
+
+# Stage 2: Train with curriculum learning
+python run.py \
+  --do_train \
+  --num_train_epochs 3 \
+  --use_label_smoothing \
+  --use_soft_weighting \
+  --cartography_output_dir ./cartography_output \
+  --output_dir ./final_model
+```
 
 ## Embedding-Based Clustering
 
@@ -205,9 +283,42 @@ Then train with filtered data:
 python run.py \
   --do_train \
   --num_train_epochs 3 \
-  --filter_data \
+  --filter_cartography \
   --cartography_output_dir ./cartography_output \
   --output_dir ./filtered_model
+```
+
+### Cluster-Based Filtering
+
+Remove problematic clusters (e.g., noise or low-quality semantic groups):
+
+```bash
+python run.py \
+  --do_train \
+  --filter_clusters \
+  --cluster_assignments_path ./cluster_output \
+  --exclude_clusters "-1,3,5" \
+  --min_cluster_probability 0.7
+```
+
+- `--filter_clusters`: Enable cluster-based filtering
+- `--cluster_assignments_path`: Path to cluster output directory
+- `--exclude_clusters`: Comma-separated cluster IDs to remove (default: "-1" for noise)
+- `--min_cluster_probability`: Minimum membership probability threshold
+
+### Combined Filtering
+
+Apply both cartography and cluster filtering:
+
+```bash
+python run.py \
+  --do_train \
+  --filter_cartography \
+  --filter_clusters \
+  --cartography_output_dir ./cartography_output \
+  --cluster_assignments_path ./cluster_output \
+  --exclude_clusters "-1" \
+  --output_dir ./clean_model
 ```
 
 ### Available Filters
@@ -215,6 +326,7 @@ python run.py \
 1. **AmbiguousQuestionFilter**: Removes low-quality ambiguous examples
 2. **CategoryFilter**: Keeps only specific categories (easy/hard/ambiguous)
 3. **ConfidenceThresholdFilter**: Filters by confidence ranges
+4. **ClusterFilter**: Removes specified clusters or low-probability assignments
 
 ### Programmatic Usage
 
@@ -225,12 +337,12 @@ from dataset_filters import apply_filters
 filter_config = {
     "ambiguous": {
         "enabled": True,
-        "cartography_metrics_path": "./cartography_output",
+        "metrics_path": "./cartography_output",
         "top_fraction": 0.33,  # Keep top 33% most ambiguous
     },
     "category": {
         "enabled": True,
-        "cartography_metrics_path": "./cartography_output",
+        "metrics_path": "./cartography_output",
         "categories": ["easy", "hard"]  # Drop all ambiguous
     }
 }
