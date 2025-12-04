@@ -75,10 +75,10 @@ class TrainingConfig:
     eval_steps: int = 500
     save_steps: int = 500
     logging_steps: int = 100
-    evaluation_strategy: str = "steps"
+    eval_strategy: str = "steps"
     save_strategy: str = "steps"
     save_total_limit: int = 2
-    load_best_model_at_end: bool = True
+    load_best_model_at_end: bool = False  # Disabled to avoid eval strategy conflicts
     metric_for_best_model: str = "eval_f1"
 
     # Ablations
@@ -222,7 +222,7 @@ class ExperimentConfig:
         args.extend(["--eval_steps", str(self.training.eval_steps)])
         args.extend(["--save_steps", str(self.training.save_steps)])
         args.extend(["--logging_steps", str(self.training.logging_steps)])
-        args.extend(["--evaluation_strategy", self.training.evaluation_strategy])
+        args.extend(["--eval_strategy", self.training.eval_strategy])
         args.extend(["--save_strategy", self.training.save_strategy])
         args.extend(["--save_total_limit", str(self.training.save_total_limit)])
         args.extend(["--metric_for_best_model", self.training.metric_for_best_model])

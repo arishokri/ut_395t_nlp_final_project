@@ -233,6 +233,7 @@ full_analysis_output/
 cartography_analysis/
 cartography_output_full/
 cartography_output_validation/
+experiments/
 
 # Example Files/Directories
 cartography_output_other/

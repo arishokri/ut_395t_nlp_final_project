@@ -434,6 +434,7 @@ def main():
         args=training_args,
         train_dataset=train_dataset_featurized,
         eval_dataset=eval_dataset_featurized,
+        eval_examples=eval_dataset,  # Pass eval_examples for periodic evaluation
         processing_class=tokenizer,
         compute_metrics=compute_metrics_and_store_predictions,
         data_collator=data_collator,
