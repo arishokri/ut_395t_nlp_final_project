@@ -76,7 +76,7 @@ class EmbeddingExtractor:
         contexts: List[str],
         answers: List[Dict[str, any]],
         batch_size: int = 32,
-        max_length: int = 384,
+        max_length: int = 512,
         show_progress: bool = True,
     ) -> np.ndarray:
         """
@@ -144,6 +144,8 @@ class EmbeddingExtractor:
         )
 
         offset_mapping = inputs.pop("offset_mapping")
+
+        # Move inputs to device
         inputs = {k: v.to(self.device) for k, v in inputs.items()}
 
         # Get hidden states from ELECTRA
@@ -161,28 +163,33 @@ class EmbeddingExtractor:
             cls_embedding = hidden_states[idx, 0, :].cpu().numpy()  # (hidden_size,)
 
             # 2. Find answer span tokens and mean-pool them
-            answer_text = (
-                answers[idx]["text"]
-                if isinstance(answers[idx], dict)
-                else answers[idx]["text"][0]
-            )
-            answer_start = (
-                answers[idx]["answer_start"]
-                if isinstance(answers[idx], dict)
-                else answers[idx]["answer_start"][0]
-            )
+            # Handle both dict and dict-with-lists formats
+            if isinstance(answers[idx]["text"], list):
+                answer_text = answers[idx]["text"][0]
+                answer_start = answers[idx]["answer_start"][0]
+            else:
+                answer_text = answers[idx]["text"]
+                answer_start = answers[idx]["answer_start"]
+
             answer_end = answer_start + len(answer_text)
 
             # Find token positions that overlap with answer span
+            # The offset_mapping for context tokens (type_id=1) gives positions relative to context
             span_token_ids = []
-            for token_idx, (start, end) in enumerate(offset_mapping[idx]):
-                # Skip special tokens (offset is (0, 0))
-                if start == 0 and end == 0:
+            sequence_ids = inputs["token_type_ids"][idx].cpu()
+
+            for token_idx, (char_start, char_end) in enumerate(offset_mapping[idx]):
+                # Skip special tokens and question tokens
+                if sequence_ids[token_idx] != 1:  # Only process context tokens
+                    continue
+
+                # Skip padding tokens (offset is (0, 0))
+                if char_start == 0 and char_end == 0:
                     continue
 
                 # Check if token overlaps with answer span
-                # Note: offsets are relative to the context, need to account for question
-                if start < answer_end and end > answer_start:
+                # Offsets are already relative to context string
+                if char_start < answer_end and char_end > answer_start:
                     span_token_ids.append(token_idx)
 
             # Mean-pool span tokens
@@ -194,9 +201,16 @@ class EmbeddingExtractor:
                     span_embeddings.mean(dim=0).cpu().numpy()
                 )  # (hidden_size,)
             else:
-                # Fallback: if no tokens found (shouldn't happen), use zero vector
-                span_embedding = np.zeros(self.hidden_size, dtype=np.float32)
-                print(f"Warning: No span tokens found for answer '{answer_text}'")
+                # Fallback: if no tokens found, use CLS as span embedding
+                # This can happen if answer is truncated or outside the context window
+                span_embedding = cls_embedding.copy()
+                if len(answer_text) > 50:
+                    # Only warn for short answers - long ones are likely truncated
+                    pass
+                elif idx < 5:  # Only warn for first few in batch to avoid spam
+                    print(
+                        f"Warning: No span tokens found for answer '{answer_text[:50]}...' (using CLS fallback)"
+                    )
 
             # 3. Concatenate [CLS] + span
             combined_embedding = np.concatenate(
@@ -214,7 +228,7 @@ def extract_and_save_embeddings(
     split: str = "train",
     max_samples: Optional[int] = None,
     batch_size: int = 32,
-    max_length: int = 384,
+    max_length: int = 512,
 ):
     """
     Extract embeddings for a dataset and save to disk.
@@ -378,7 +392,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--max_length",
         type=int,
-        default=384,
+        default=512,
         help="Maximum sequence length",
     )
 

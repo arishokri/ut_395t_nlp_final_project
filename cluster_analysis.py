@@ -14,6 +14,7 @@ Pipeline:
 import argparse
 import json
 import os
+import warnings
 from typing import Optional
 
 import datasets
@@ -27,6 +28,9 @@ from sklearn.preprocessing import StandardScaler
 
 from extract_embeddings import load_embeddings
 from helpers import generate_hash_ids
+
+# Suppress sklearn deprecation warnings
+warnings.filterwarnings("ignore", category=FutureWarning, module="sklearn")
 
 
 class ClusterAnalyzer:
@@ -153,6 +157,7 @@ class ClusterAnalyzer:
             min_samples=min_samples,
             metric=metric,
             cluster_selection_epsilon=cluster_selection_epsilon,
+            algorithm="best",  # Uses faster approximations for large datasets
             **kwargs,
         )
 
@@ -279,6 +284,7 @@ def analyze_clusters(
     output_dir: str,
     dataset_name: str = "Eladio/emrqa-msquad",
     split: str = "train",
+    max_samples: Optional[int] = None,
     reduction_dim: int = 50,
     reduction_method: str = "pca",
     min_cluster_size: int = 10,
@@ -294,6 +300,7 @@ def analyze_clusters(
         output_dir: Directory to save results
         dataset_name: Dataset name (to load original examples)
         split: Dataset split
+        max_samples: Maximum number of samples to cluster (None = all)
         reduction_dim: Intermediate dimensionality (30-50 recommended)
         reduction_method: Method for initial reduction ('pca' or 'umap')
         min_cluster_size: Minimum size for HDBSCAN clusters
@@ -310,6 +317,16 @@ def analyze_clusters(
     # Load embeddings
     print(f"\n1. Loading embeddings from {embedding_dir}...")
     embeddings, metadata = load_embeddings(embedding_dir)
+
+    # Sample if requested
+    if max_samples and max_samples < len(embeddings):
+        print(f"   Sampling {max_samples} from {embeddings.shape[0]} embeddings...")
+        indices = np.random.RandomState(42).choice(
+            len(embeddings), max_samples, replace=False
+        )
+        indices = np.sort(indices)  # Keep order for dataset alignment
+        embeddings = embeddings[indices]
+
     print(
         f"   Loaded {embeddings.shape[0]} embeddings of dimension {embeddings.shape[1]}"
     )
@@ -329,8 +346,13 @@ def analyze_clusters(
         print("   Generating IDs for dataset examples...")
         data_split = data_split.map(generate_hash_ids)
 
-    # Match dataset size with embeddings
-    if len(data_split) > len(embeddings):
+    # Match dataset size with embeddings (including sampling)
+    if max_samples and max_samples < len(data_split):
+        # Use same indices as embeddings if we sampled
+        data_split = data_split.select(
+            indices.tolist() if max_samples else range(len(embeddings))
+        )
+    elif len(data_split) > len(embeddings):
         data_split = data_split.select(range(len(embeddings)))
 
     dataset_df = pd.DataFrame(data_split)
@@ -499,13 +521,27 @@ def create_cluster_visualizations(
         else:
             sizes = 20
 
+        # Use distinct color and styling for noise
+        if cluster_id == -1:
+            color = "#808080"  # Gray color for noise
+            alpha = 0.4
+            marker = "x"
+            sizes = 15  # Smaller, uniform size for noise
+        else:
+            color = colors[i]
+            alpha = 0.6
+            marker = "o"
+
         ax.scatter(
             cluster_data["dim1"],
             cluster_data["dim2"],
-            c=[colors[i]],
+            c=[color],
             label=label,
-            alpha=0.6 if cluster_id >= 0 else 0.3,
+            alpha=alpha,
             s=sizes,
+            marker=marker,
+            edgecolors="black" if cluster_id == -1 else "none",
+            linewidths=0.5 if cluster_id == -1 else 0,
         )
 
     ax.set_xlabel(f"{reduction_method.upper()} Dimension 1", fontsize=12)
@@ -648,6 +684,12 @@ if __name__ == "__main__":
         help="Dataset split to analyze",
     )
     parser.add_argument(
+        "--max_samples",
+        type=int,
+        default=None,
+        help="Maximum number of samples to cluster (useful for large datasets)",
+    )
+    parser.add_argument(
         "--reduction_dim",
         type=int,
         default=50,
@@ -693,6 +735,7 @@ if __name__ == "__main__":
         output_dir=args.output_dir,
         dataset_name=args.dataset,
         split=args.split,
+        max_samples=args.max_samples,
         reduction_dim=args.reduction_dim,
         reduction_method=args.reduction_method,
         min_cluster_size=args.min_cluster_size,

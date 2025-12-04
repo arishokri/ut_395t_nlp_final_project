@@ -545,7 +545,9 @@ def create_integrated_visualizations(merged_df: pd.DataFrame, output_dir: str):
             merged_df[merged_df["cluster"] == c][metric].values for c in cluster_ids
         ]
 
-        bp = ax.boxplot(data, labels=[f"C{i}" for i in cluster_ids], patch_artist=True)
+        bp = ax.boxplot(
+            data, tick_labels=[f"C{i}" for i in cluster_ids], patch_artist=True
+        )
 
         # Color boxes
         for patch in bp["boxes"]:
@@ -609,7 +611,7 @@ def main():
     parser.add_argument(
         "--output_dir",
         type=str,
-        default="./analysis_output",
+        default="./full_analysis_output",
         help="Directory to save analysis outputs",
     )
 
