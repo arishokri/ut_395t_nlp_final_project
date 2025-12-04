@@ -135,8 +135,8 @@ def prepare_train_dataset_qa(
 
     # If passage-only, destroy question content
     if ablations == "p_only":
-        # generic question template so model doesn't find value in this
-        questions = ["What is the answer?" for _ in questions]
+        # Use domain-agnostic instruction to force model to rely on passage
+        questions = ["Find the answer in the passage." for _ in questions]
 
     tokenized_examples = tokenizer(
         questions,
