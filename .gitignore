@@ -232,6 +232,7 @@ trained_models/
 full_analysis_output/
 cartography_analysis/
 cartography_output_full/
+cartography_output_validation/
 
 # Example Files/Directories
 cartography_output_other/

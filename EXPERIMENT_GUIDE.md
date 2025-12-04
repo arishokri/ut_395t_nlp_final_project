@@ -19,6 +19,8 @@ Before running experiments, you need to have:
 
 - Cartography metrics from a previous training run (for filtering/smoothing/weighting strategies)
 - Optionally: Cluster assignments (for cluster-based filtering)
+- Optionally: If you're using filtering strategy you need to run cartography on validation split as well.
+- Make sure you keep track of where you are saving the results of all the above otherwise they might be overwritten.
 
 Generate cartography metrics:
 
@@ -28,7 +30,7 @@ python run.py \
     --enable_cartography \
     --cartography_output_dir ./cartography_output \
     --max_train_samples 10000 \
-    --num_train_epochs 3 \
+    --num_train_epochs 5 \
     --output_dir ./initial_training
 ```
 
