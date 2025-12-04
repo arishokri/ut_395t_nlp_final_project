@@ -99,7 +99,7 @@ def main():
         action="store_true",
         help="Filter dataset based on cartography metrics (removes ambiguous examples).",
     )
-    #! This one doesn't need to be applied to validation set on evaluation run (cluster mismatch.)
+
     argp.add_argument(
         "--filter_clusters",
         action="store_true",
@@ -118,7 +118,7 @@ def main():
         default="-1",
         help="Comma-separated list of cluster IDs to exclude (e.g., '3,4,-1'). Default: '-1' (excludes noise).",
     )
-    #! Make sure to include this in sweeps.
+
     argp.add_argument(
         "--min_cluster_probability",
         type=float,
@@ -160,6 +160,7 @@ def main():
         default="train",
         help="Dataset split to use for training (default: 'train'). Use 'validation' to run cartography on validation data.",
     )
+    # Validation filtering currenlty only applies when filter_cartography=true
     argp.add_argument(
         "--filter_validation",
         action="store_true",
@@ -442,9 +443,10 @@ def main():
             eval_dataset = eval_dataset.select(range(args.max_eval_samples))
 
         # Apply filtering to validation set if requested
-        if args.filter_validation:
+        # Note: Only filter validation when using cartography filtering, not cluster filtering
+        if args.filter_validation and args.filter_cartography:
             print(f"\n{'=' * 70}")
-            print("APPLYING FILTERS TO VALIDATION SET")
+            print("APPLYING CARTOGRAPHY FILTERS TO VALIDATION SET")
             print(f"{'=' * 70}")
 
             original_eval_size = len(eval_dataset)
@@ -455,38 +457,17 @@ def main():
                 if args.validation_cartography_output_dir
                 else args.cartography_output_dir
             )
-            val_cluster_path = (
-                args.validation_cluster_assignments_path
-                if args.validation_cluster_assignments_path
-                else args.cluster_assignments_path
-            )
 
-            # Build filter config for validation
+            # Build filter config for validation (only cartography, not clusters)
             val_filter_config = {}
 
-            if args.filter_cartography:
-                val_filter_config["ambiguous"] = {
-                    "enabled": True,
-                    "metrics_path": val_cartography_dir,
-                    "top_fraction": 0.33,
-                    "apply_rule_based_filter": False,
-                }
-                print(f"  Cartography metrics from: {val_cartography_dir}")
-
-            if args.filter_clusters:
-                exclude_clusters = []
-                if args.exclude_clusters.strip():
-                    exclude_clusters = [
-                        int(c.strip()) for c in args.exclude_clusters.split(",")
-                    ]
-
-                val_filter_config["cluster"] = {
-                    "enabled": True,
-                    "cluster_path": val_cluster_path,
-                    "exclude_clusters": exclude_clusters,
-                    "min_probability": args.min_cluster_probability,
-                }
-                print(f"  Cluster assignments from: {val_cluster_path}")
+            val_filter_config["ambiguous"] = {
+                "enabled": True,
+                "metrics_path": val_cartography_dir,
+                "top_fraction": 0.33,
+                "apply_rule_based_filter": False,
+            }
+            print(f"  Cartography metrics from: {val_cartography_dir}")
 
             # Apply filters to validation set
             if val_filter_config:
