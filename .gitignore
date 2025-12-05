@@ -232,8 +232,6 @@ full_analysis_output/
 cartography_analysis/
 cartography_output*/
 experiments/
-
-# Example Files/Directories
 notebooks/*.json
 extra_guides/
 
