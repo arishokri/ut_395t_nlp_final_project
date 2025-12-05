@@ -92,7 +92,7 @@ def main():
         "--cartography_output_dir",
         type=str,
         default="./cartography_output",
-        help="Directory for cartography outputs. Used for: saving training dynamics (--enable_cartography), filtering (--filter_cartography), label smoothing (--use_label_smoothing), and soft weighting (--use_soft_weighting).",
+        help="Directory for cartography outputs. Used for: saving training dynamics (--enable_cartography), filtering (--filter_ambiguous), label smoothing (--use_label_smoothing), and soft weighting (--use_soft_weighting).",
     )
     argp.add_argument(
         "--filter_ambiguous",
@@ -385,6 +385,10 @@ def main():
         if args.max_train_samples:
             train_dataset = train_dataset.select(range(args.max_train_samples))
 
+        # Track filtering statistics
+        train_original_size = len(train_dataset)
+        train_total_removed = 0
+
         # Apply ambiguous filtering if requested
         if args.filter_ambiguous:
             print(f"\n{'=' * 70}")
@@ -392,7 +396,7 @@ def main():
             print(f"{'=' * 70}")
             print(f"Using cartography metrics from: {args.cartography_output_dir}")
 
-            original_size = len(train_dataset)
+            size_before = len(train_dataset)
 
             # Create filter configuration
             filter_config = {
@@ -408,27 +412,17 @@ def main():
             # Apply filters
             train_dataset = apply_filters(train_dataset, filter_config)
 
-            filtered_size = len(train_dataset)
-            removed_count = original_size - filtered_size
+            size_after = len(train_dataset)
+            removed_count = size_before - size_after
+            train_total_removed += removed_count
 
-            print("\nFiltering Summary:")
-            print(f"  Original size: {original_size}")
-            print(f"  Filtered size: {filtered_size}")
+            print("\nAmbiguous Filtering Summary:")
+            print(f"  Before: {size_before}")
+            print(f"  After: {size_after}")
             print(
-                f"  Removed: {removed_count} examples ({removed_count / original_size * 100:.1f}%)"
+                f"  Removed: {removed_count} examples ({removed_count / size_before * 100:.1f}%)"
             )
             print(f"{'=' * 70}\n")
-
-            # Log to wandb
-            if wandb_enabled:
-                wandb.log(
-                    {
-                        "train/original_size": original_size,
-                        "train/filtered_size": filtered_size,
-                        "train/removed_count": removed_count,
-                        "train/removal_percentage": removed_count / original_size * 100,
-                    }
-                )
 
         # Apply rule-based filtering if requested
         if args.filter_rule_based:
@@ -438,7 +432,7 @@ def main():
             print(f"Rule: {args.rule_name}")
             print(f"Similarity threshold: {args.rule_sim_threshold}")
 
-            original_size = len(train_dataset)
+            size_before = len(train_dataset)
 
             # Create filter configuration
             filter_config = {
@@ -452,29 +446,17 @@ def main():
             # Apply filters
             train_dataset = apply_filters(train_dataset, filter_config)
 
-            filtered_size = len(train_dataset)
-            removed_count = original_size - filtered_size
+            size_after = len(train_dataset)
+            removed_count = size_before - size_after
+            train_total_removed += removed_count
 
             print("\nRule-Based Filtering Summary:")
-            print(f"  Original size: {original_size}")
-            print(f"  Filtered size: {filtered_size}")
+            print(f"  Before: {size_before}")
+            print(f"  After: {size_after}")
             print(
-                f"  Removed: {removed_count} examples ({removed_count / original_size * 100:.1f}%)"
+                f"  Removed: {removed_count} examples ({removed_count / size_before * 100:.1f}%)"
             )
             print(f"{'=' * 70}\n")
-
-            # Log to wandb
-            if wandb_enabled:
-                wandb.log(
-                    {
-                        "train/rule_original_size": original_size,
-                        "train/rule_filtered_size": filtered_size,
-                        "train/rule_removed_count": removed_count,
-                        "train/rule_removal_percentage": removed_count
-                        / original_size
-                        * 100,
-                    }
-                )
 
         # Apply cluster filtering if requested
         if args.filter_clusters:
@@ -491,7 +473,7 @@ def main():
                     f"Using cluster assignments from: {args.cluster_assignments_path}"
                 )
 
-                original_size = len(train_dataset)
+                size_before = len(train_dataset)
 
                 # Determine which clusters to exclude
                 exclude_clusters = [-1] if args.exclude_noise_cluster else []
@@ -509,14 +491,15 @@ def main():
                 # Apply filters
                 train_dataset = apply_filters(train_dataset, filter_config)
 
-                filtered_size = len(train_dataset)
-                removed_count = original_size - filtered_size
+                size_after = len(train_dataset)
+                removed_count = size_before - size_after
+                train_total_removed += removed_count
 
                 print("\nCluster Filtering Summary:")
-                print(f"  Original size: {original_size}")
-                print(f"  Filtered size: {filtered_size}")
+                print(f"  Before: {size_before}")
+                print(f"  After: {size_after}")
                 print(
-                    f"  Removed: {removed_count} examples ({removed_count / original_size * 100:.1f}%)"
+                    f"  Removed: {removed_count} examples ({removed_count / size_before * 100:.1f}%)"
                 )
                 if args.exclude_noise_cluster:
                     print("  Excluded noise cluster: -1")
@@ -524,18 +507,19 @@ def main():
                     print(f"  Min cluster probability: {args.min_cluster_probability}")
                 print(f"{'=' * 70}\n")
 
-                # Log to wandb
-                if wandb_enabled:
-                    wandb.log(
-                        {
-                            "train/cluster_original_size": original_size,
-                            "train/cluster_filtered_size": filtered_size,
-                            "train/cluster_removed_count": removed_count,
-                            "train/cluster_removal_percentage": removed_count
-                            / original_size
-                            * 100,
-                        }
-                    )
+        # Log cumulative training filtering stats to wandb
+        train_final_size = len(train_dataset)
+        if wandb_enabled and train_total_removed > 0:
+            wandb.log(
+                {
+                    "train/original_size": train_original_size,
+                    "train/final_size": train_final_size,
+                    "train/total_removed": train_total_removed,
+                    "train/total_removal_percentage": train_total_removed
+                    / train_original_size
+                    * 100,
+                }
+            )
 
         train_dataset_featurized = train_dataset.map(
             prepare_train_dataset,
@@ -548,6 +532,10 @@ def main():
         if args.max_eval_samples:
             eval_dataset = eval_dataset.select(range(args.max_eval_samples))
 
+        # Track eval filtering statistics
+        eval_original_size = len(eval_dataset)
+        eval_total_removed = 0
+
         # Apply filtering to validation set if requested
         # Note: filter_validation works with all filtering strategies
         if args.filter_validation and (
@@ -557,8 +545,6 @@ def main():
             print("APPLYING FILTERS TO VALIDATION SET")
             print(f"{'=' * 70}")
 
-            original_eval_size = len(eval_dataset)
-
             # Determine paths for validation filtering
             val_cartography_dir = (
                 args.validation_cartography_output_dir
@@ -566,85 +552,114 @@ def main():
                 else args.cartography_output_dir
             )
 
-            # Build filter config for validation
-            val_filter_config = {}
-
-            # Add ambiguous filtering if enabled
+            # Apply ambiguous filtering if enabled
             if args.filter_ambiguous:
-                val_filter_config["ambiguous"] = {
-                    "enabled": True,
-                    "metrics_path": val_cartography_dir,
-                    "top_fraction": args.ambiguous_top_fraction,
-                    "variability_margin": args.variability_margin,
-                    "apply_rule_based_filter": False,
-                }
-                print(f"  Cartography metrics from: {val_cartography_dir}")
-                print(f"  Top fraction: {args.ambiguous_top_fraction}")
-                print(f"  Variability margin: {args.variability_margin}")
+                size_before = len(eval_dataset)
 
-            # Add rule-based filtering if enabled
-            if args.filter_rule_based:
-                val_filter_config["rule_based"] = {
-                    "enabled": True,
-                    "rule_name": args.rule_name,
-                    "sim_threshold": args.rule_sim_threshold,
+                val_filter_config = {
+                    "ambiguous": {
+                        "enabled": True,
+                        "metrics_path": val_cartography_dir,
+                        "top_fraction": args.ambiguous_top_fraction,
+                        "variability_margin": args.variability_margin,
+                        "apply_rule_based_filter": False,
+                    }
                 }
+
+                eval_dataset = apply_filters(eval_dataset, val_filter_config)
+
+                size_after = len(eval_dataset)
+                removed_count = size_before - size_after
+                eval_total_removed += removed_count
+
+                print(f"  Ambiguous filtering: removed {removed_count} examples")
+                print(f"    Cartography metrics from: {val_cartography_dir}")
+                print(f"    Top fraction: {args.ambiguous_top_fraction}")
+                print(f"    Variability margin: {args.variability_margin}")
+
+            # Apply rule-based filtering if enabled
+            if args.filter_rule_based:
+                size_before = len(eval_dataset)
+
+                val_filter_config = {
+                    "rule_based": {
+                        "enabled": True,
+                        "rule_name": args.rule_name,
+                        "sim_threshold": args.rule_sim_threshold,
+                    }
+                }
+
+                eval_dataset = apply_filters(eval_dataset, val_filter_config)
+
+                size_after = len(eval_dataset)
+                removed_count = size_before - size_after
+                eval_total_removed += removed_count
+
+                print(f"  Rule-based filtering: removed {removed_count} examples")
                 print(
-                    f"  Rule-based filter: {args.rule_name} (threshold: {args.rule_sim_threshold})"
+                    f"    Rule: {args.rule_name} (threshold: {args.rule_sim_threshold})"
                 )
 
-            # Add cluster filtering if enabled
+            # Apply cluster filtering if enabled
             if args.filter_clusters:
                 # Only apply cluster filtering to validation if explicit path is provided
                 if args.validation_cluster_assignments_path:
+                    size_before = len(eval_dataset)
+
                     exclude_clusters = [-1] if args.exclude_noise_cluster else []
-                    val_filter_config["cluster"] = {
-                        "enabled": True,
-                        "cluster_path": args.validation_cluster_assignments_path,
-                        "exclude_clusters": exclude_clusters,
-                        "min_probability": args.min_cluster_probability,
+                    val_filter_config = {
+                        "cluster": {
+                            "enabled": True,
+                            "cluster_path": args.validation_cluster_assignments_path,
+                            "exclude_clusters": exclude_clusters,
+                            "min_probability": args.min_cluster_probability,
+                        }
                     }
+
+                    eval_dataset = apply_filters(eval_dataset, val_filter_config)
+
+                    size_after = len(eval_dataset)
+                    removed_count = size_before - size_after
+                    eval_total_removed += removed_count
+
+                    print(f"  Cluster filtering: removed {removed_count} examples")
                     print(
-                        f"  Cluster assignments from: {args.validation_cluster_assignments_path}"
+                        f"    Cluster assignments from: {args.validation_cluster_assignments_path}"
                     )
                     if args.exclude_noise_cluster:
-                        print("  Excluding noise cluster: -1")
+                        print("    Excluding noise cluster: -1")
                     if args.min_cluster_probability:
                         print(
-                            f"  Min cluster probability: {args.min_cluster_probability}"
+                            f"    Min cluster probability: {args.min_cluster_probability}"
                         )
                 else:
                     print(
                         "  Warning: Skipping cluster filtering for validation (no --validation_cluster_assignments_path provided)"
                     )
 
-            # Apply filters to validation set
-            if val_filter_config:
-                eval_dataset = apply_filters(eval_dataset, val_filter_config)
+            # Print and log summary
+            eval_final_size = len(eval_dataset)
 
-                filtered_eval_size = len(eval_dataset)
-                removed_eval_count = original_eval_size - filtered_eval_size
-
-                print("\nValidation Filtering Summary:")
-                print(f"  Original size: {original_eval_size}")
-                print(f"  Filtered size: {filtered_eval_size}")
-                print(
-                    f"  Removed: {removed_eval_count} examples ({removed_eval_count / original_eval_size * 100:.1f}%)"
-                )
-
-                # Log to wandb
-                if wandb_enabled:
-                    wandb.log(
-                        {
-                            "eval/original_size": original_eval_size,
-                            "eval/filtered_size": filtered_eval_size,
-                            "eval/removed_count": removed_eval_count,
-                            "eval/removal_percentage": removed_eval_count
-                            / original_eval_size
-                            * 100,
-                        }
-                    )
+            print("\nValidation Filtering Summary:")
+            print(f"  Original size: {eval_original_size}")
+            print(f"  Final size: {eval_final_size}")
+            print(
+                f"  Total removed: {eval_total_removed} examples ({eval_total_removed / eval_original_size * 100:.1f}%)"
+            )
             print(f"{'=' * 70}\n")
+
+            # Log to wandb
+            if wandb_enabled:
+                wandb.log(
+                    {
+                        "eval/original_size": eval_original_size,
+                        "eval/final_size": eval_final_size,
+                        "eval/total_removed": eval_total_removed,
+                        "eval/total_removal_percentage": eval_total_removed
+                        / eval_original_size
+                        * 100,
+                    }
+                )
 
         eval_dataset_featurized = eval_dataset.map(
             prepare_eval_dataset,
