@@ -64,9 +64,11 @@ parameters:
     value: false
 
   # No filtering on training or validation
-  filter_cartography:
+  filter_ambiguous:
     value: false
   filter_clusters:
+    value: false
+  filter_rule_based:
     value: false
   filter_validation:
     value: false
@@ -76,22 +78,16 @@ parameters:
     values: [false, true]
 
   smoothing_factor:
-    distribution: uniform
-    min: 0.3
-    max: 0.9
+    values: [0.2, 0.4, 0.6, 0.8]
 
   use_soft_weighting:
     values: [false, true]
 
   weight_clip_min:
-    distribution: uniform
-    min: 0.05
-    max: 0.3
+    values: [0.05, 0.1, 0.2]
 
   weight_clip_max:
-    distribution: uniform
-    min: 3.0
-    max: 20.0
+    values: [5.0, 10.0, 15.0]
 
 # Output directory pattern
 command:
