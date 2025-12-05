@@ -541,8 +541,17 @@ def main():
                     print(f"  Min cluster probability: {args.min_cluster_probability}")
                 print(f"{'=' * 70}\n")
 
-        # Log cumulative training filtering stats to wandb
+        # Print and log cumulative training filtering stats
         train_final_size = len(train_dataset)
+        if train_total_removed > 0:
+            print("\nTraining Filtering Summary:")
+            print(f"  Original size: {train_original_size}")
+            print(f"  Final size: {train_final_size}")
+            print(
+                f"  Total removed: {train_total_removed} examples ({train_total_removed / train_original_size * 100:.1f}%)"
+            )
+            print(f"{'=' * 70}\n")
+
         if wandb_enabled and train_total_removed > 0:
             wandb.log(
                 {
