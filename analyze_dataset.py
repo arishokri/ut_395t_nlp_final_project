@@ -418,6 +418,52 @@ def create_cartography_plots(cartography_df: pd.DataFrame, output_dir: str):
     print(f"   - Saved confidence vs correctness to {fig_path}")
     plt.close()
 
+    # Category breakdown: Pie chart + Box plot
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+
+    # Pie chart
+    ax = axes[0]
+    category_counts = cartography_df["category"].value_counts()
+    colors_map = {
+        "easy": "green",
+        "hard": "red",
+        "ambiguous": "orange",
+        "easy_variable": "lightgreen",
+    }
+    colors = [colors_map.get(cat, "gray") for cat in category_counts.index]
+
+    ax.pie(
+        category_counts.values,
+        labels=category_counts.index,
+        autopct="%1.1f%%",
+        colors=colors,
+        startangle=90,
+    )
+    ax.set_title("Example Distribution by Category", fontsize=13, fontweight="bold")
+
+    # Box plot
+    ax = axes[1]
+    categories = cartography_df["category"].unique()
+    confidence_by_cat = [
+        cartography_df[cartography_df["category"] == cat]["confidence"].values
+        for cat in categories
+    ]
+
+    bp = ax.boxplot(confidence_by_cat, labels=categories, patch_artist=True)
+    for patch, cat in zip(bp["boxes"], categories):
+        patch.set_facecolor(colors_map.get(cat, "gray"))
+        patch.set_alpha(0.7)
+
+    ax.set_ylabel("Confidence", fontsize=12)
+    ax.set_title("Confidence Distribution by Category", fontsize=13, fontweight="bold")
+    ax.grid(True, alpha=0.3, axis="y")
+
+    plt.tight_layout()
+    fig_path = os.path.join(output_dir, "category_analysis.png")
+    plt.savefig(fig_path, dpi=300, bbox_inches="tight")
+    print(f"   - Saved category analysis to {fig_path}")
+    plt.close()
+
 
 def create_integrated_visualizations(merged_df: pd.DataFrame, output_dir: str):
     """Create integrated visualizations showing both cartography and clustering."""
@@ -890,8 +936,8 @@ def main():
     parser.add_argument(
         "--split",
         type=str,
-        default="train",
-        help="Dataset split to analyze",
+        default=None,
+        help="Optional: Dataset split to analyze (required if --cluster_dir is not provided)",
     )
     parser.add_argument(
         "--n_examples",
@@ -927,7 +973,28 @@ def main():
         print("Error: Must specify at least one of --cartography_dir or --cluster_dir")
         return
 
-    # Handle unified export request
+    # Resolve split parameter
+    split = args.split
+    if split is None:
+        # Try to extract from cluster metadata if available
+        if has_clustering:
+            metadata_file = os.path.join(args.cluster_dir, "cluster_metadata.json")
+            if os.path.exists(metadata_file):
+                with open(metadata_file, "r") as f:
+                    cluster_metadata = json.load(f)
+                split = cluster_metadata.get("split")
+                if split:
+                    print(f"Using split '{split}' from cluster metadata")
+
+        # If still None, require user to specify
+        if split is None:
+            print("Error: --split parameter is required.")
+            print("Please specify either 'train' or 'validation'")
+            return
+
+    # Run all applicable analyses (non-exclusive)
+
+    # 1. Handle unified export if requested
     if args.export_unified:
         if not (has_cartography and has_clustering):
             print(
@@ -939,34 +1006,36 @@ def main():
             cartography_dir=args.cartography_dir,
             cluster_dir=args.cluster_dir,
             dataset_name=args.dataset,
-            split=args.split,
+            split=split,
             output_dir=args.output_dir,
             include_rules=not args.no_rules,
         )
-        return
+        # Continue to other analyses instead of returning
 
+    # 2. Cartography-only analysis
+    if has_cartography:
+        analyze_cartography_only(
+            cartography_dir=args.cartography_dir,
+            dataset_name=args.dataset,
+            split=split,
+            n_examples=args.n_examples,
+            output_dir=args.output_dir,
+        )
+
+    # 3. Clustering-only analysis
+    if has_clustering:
+        analyze_clustering_only(
+            cluster_dir=args.cluster_dir,
+            output_dir=args.output_dir,
+        )
+
+    # 4. Integrated analysis (if both available)
     if has_cartography and has_clustering:
-        # Integrated analysis
         analyze_integrated(
             cartography_dir=args.cartography_dir,
             cluster_dir=args.cluster_dir,
             dataset_name=args.dataset,
-            split=args.split,
-            output_dir=args.output_dir,
-        )
-    elif has_cartography:
-        # Cartography only
-        analyze_cartography_only(
-            cartography_dir=args.cartography_dir,
-            dataset_name=args.dataset,
-            split=args.split,
-            n_examples=args.n_examples,
-            output_dir=args.output_dir,
-        )
-    else:
-        # Clustering only
-        analyze_clustering_only(
-            cluster_dir=args.cluster_dir,
+            split=split,
             output_dir=args.output_dir,
         )
 

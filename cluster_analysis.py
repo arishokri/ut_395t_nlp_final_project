@@ -317,7 +317,6 @@ def analyze_clusters(
     embedding_dir: str,
     output_dir: str,
     dataset_name: str = "Eladio/emrqa-msquad",
-    split: str = "train",
     max_samples: Optional[int] = None,
     reduction_dim: int = 50,
     reduction_method: str = "pca",
@@ -333,7 +332,6 @@ def analyze_clusters(
         embedding_dir: Directory containing embeddings
         output_dir: Directory to save results
         dataset_name: Dataset name (to load original examples)
-        split: Dataset split
         max_samples: Maximum number of samples to cluster (None = all)
         reduction_dim: Intermediate dimensionality (30-50 recommended)
         reduction_method: Method for initial reduction ('pca' or 'umap')
@@ -351,6 +349,10 @@ def analyze_clusters(
     # Load embeddings
     print(f"\n1. Loading embeddings from {embedding_dir}...")
     embeddings, metadata = load_embeddings(embedding_dir)
+
+    # Extract split from metadata
+    split = metadata.get("split", "train")
+    print(f"   Using split from metadata: {split}")
 
     # Sample if requested
     if max_samples and max_samples < len(embeddings):
@@ -495,6 +497,7 @@ def analyze_clusters(
     # Save metadata
     analysis_metadata = {
         "embedding_dir": embedding_dir,
+        "split": split,
         "n_samples": int(len(embeddings)),
         "embedding_dim": int(embeddings.shape[1]),
         "reduction_dim": reduction_dim,
@@ -718,12 +721,6 @@ if __name__ == "__main__":
         help="Dataset name or path",
     )
     parser.add_argument(
-        "--split",
-        type=str,
-        default="train",
-        help="Dataset split to analyze",
-    )
-    parser.add_argument(
         "--max_samples",
         type=int,
         default=None,
@@ -774,7 +771,6 @@ if __name__ == "__main__":
         embedding_dir=args.embedding_dir,
         output_dir=args.output_dir,
         dataset_name=args.dataset,
-        split=args.split,
         max_samples=args.max_samples,
         reduction_dim=args.reduction_dim,
         reduction_method=args.reduction_method,
