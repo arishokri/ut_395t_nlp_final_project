@@ -890,8 +890,8 @@ def main():
     parser.add_argument(
         "--split",
         type=str,
-        default="train",
-        help="Dataset split to analyze",
+        default=None,
+        help="Optional: Dataset split to analyze (required if --cluster_dir is not provided)",
     )
     parser.add_argument(
         "--n_examples",
@@ -927,7 +927,28 @@ def main():
         print("Error: Must specify at least one of --cartography_dir or --cluster_dir")
         return
 
-    # Handle unified export request
+    # Resolve split parameter
+    split = args.split
+    if split is None:
+        # Try to extract from cluster metadata if available
+        if has_clustering:
+            metadata_file = os.path.join(args.cluster_dir, "cluster_metadata.json")
+            if os.path.exists(metadata_file):
+                with open(metadata_file, "r") as f:
+                    cluster_metadata = json.load(f)
+                split = cluster_metadata.get("split")
+                if split:
+                    print(f"Using split '{split}' from cluster metadata")
+
+        # If still None, require user to specify
+        if split is None:
+            print("Error: --split parameter is required.")
+            print("Please specify either 'train' or 'validation'")
+            return
+
+    # Run all applicable analyses (non-exclusive)
+
+    # 1. Handle unified export if requested
     if args.export_unified:
         if not (has_cartography and has_clustering):
             print(
@@ -939,34 +960,36 @@ def main():
             cartography_dir=args.cartography_dir,
             cluster_dir=args.cluster_dir,
             dataset_name=args.dataset,
-            split=args.split,
+            split=split,
             output_dir=args.output_dir,
             include_rules=not args.no_rules,
         )
-        return
+        # Continue to other analyses instead of returning
 
+    # 2. Cartography-only analysis
+    if has_cartography:
+        analyze_cartography_only(
+            cartography_dir=args.cartography_dir,
+            dataset_name=args.dataset,
+            split=split,
+            n_examples=args.n_examples,
+            output_dir=args.output_dir,
+        )
+
+    # 3. Clustering-only analysis
+    if has_clustering:
+        analyze_clustering_only(
+            cluster_dir=args.cluster_dir,
+            output_dir=args.output_dir,
+        )
+
+    # 4. Integrated analysis (if both available)
     if has_cartography and has_clustering:
-        # Integrated analysis
         analyze_integrated(
             cartography_dir=args.cartography_dir,
             cluster_dir=args.cluster_dir,
             dataset_name=args.dataset,
-            split=args.split,
-            output_dir=args.output_dir,
-        )
-    elif has_cartography:
-        # Cartography only
-        analyze_cartography_only(
-            cartography_dir=args.cartography_dir,
-            dataset_name=args.dataset,
-            split=args.split,
-            n_examples=args.n_examples,
-            output_dir=args.output_dir,
-        )
-    else:
-        # Clustering only
-        analyze_clustering_only(
-            cluster_dir=args.cluster_dir,
+            split=split,
             output_dir=args.output_dir,
         )
 
