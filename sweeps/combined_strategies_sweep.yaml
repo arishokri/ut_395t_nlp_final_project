@@ -1,6 +1,5 @@
 # Sweep configuration combining filtering with smoothing/weighting
 # Experiments that combine data filtering strategies with training modifications
-# Note: Validation filtering only applies when filter_cartography=true
 # (cluster filtering does not filter validation set to avoid cluster mismatch)
 
 program: run.py
@@ -49,14 +48,23 @@ parameters:
     value: true
 
   # Combined strategies search space
+
+  # Filtering strategies (from filtering_strategies_sweep.yaml)
+  filter_rule_based:
+    values: [true, false]
+
   filter_ambiguous:
     values: [true, false]
 
   ambiguous_top_fraction:
-    values: [0.25, 0.33, 0.55, 0.7]
+    distribution: uniform
+    min: 0.25
+    max: 0.70
 
   variability_margin:
-    values: [-0.05, 0.0, 0.05]
+    distribution: uniform
+    min: -0.05
+    max: 0.05
 
   filter_clusters:
     values: [true, false]
@@ -65,22 +73,31 @@ parameters:
     values: [true, false]
 
   min_cluster_probability:
-    values: ["0.5", "0.6", "0.7", "0.8"]
+    distribution: uniform
+    min: 0.5
+    max: 0.9
 
+  # Smoothing/weighting strategies (from smoothing_weighting_sweep.yaml)
   use_label_smoothing:
     values: [true, false]
 
   smoothing_factor:
-    values: [0.2, 0.4, 0.6, 0.8]
+    distribution: uniform
+    min: 0.2
+    max: 0.8
 
   use_soft_weighting:
     values: [true, false]
 
   weight_clip_min:
-    values: [0.05, 0.1, 0.2]
+    distribution: uniform
+    min: 0.05
+    max: 0.2
 
   weight_clip_max:
-    values: [5.0, 10.0, 15.0]
+    distribution: uniform
+    min: 5
+    max: 15
 
 # Early termination for poorly performing runs
 early_terminate:

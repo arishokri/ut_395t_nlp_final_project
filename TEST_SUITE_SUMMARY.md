@@ -26,7 +26,7 @@ This comprehensive test suite replaces the `demos/` directory with proper pytest
 
 **Entry Points Tested:**
 
-- `--filter_cartography`
+- `--filter_ambiguous`
 - `--filter_clusters`
 - `--exclude_noise_cluster`
 - `--min_cluster_probability`
@@ -95,7 +95,7 @@ This comprehensive test suite replaces the `demos/` directory with proper pytest
 
 - `--do_train`
 - `--enable_cartography`
-- `--filter_cartography`
+- `--filter_ambiguous`
 - `--filter_clusters`
 - `--use_label_smoothing`
 - `--smoothing_factor`
@@ -130,7 +130,7 @@ This comprehensive test suite replaces the `demos/` directory with proper pytest
 | `--ablations`                           | ✅     | test_run_integration.py, test_helpers.py          |
 | `--enable_cartography`                  | ✅     | test_run_integration.py, test_cartography.py      |
 | `--cartography_output_dir`              | ✅     | test_cartography.py, test_run_integration.py      |
-| `--filter_cartography`                  | ✅     | test_dataset_filters.py, test_run_integration.py  |
+| `--filter_ambiguous`                    | ✅     | test_dataset_filters.py, test_run_integration.py  |
 | `--filter_clusters`                     | ✅     | test_dataset_filters.py, test_run_integration.py  |
 | `--cluster_assignments_path`            | ✅     | test_cluster_analysis.py, test_run_integration.py |
 | `--exclude_noise_cluster`               | ✅     | test_dataset_filters.py, test_run_integration.py  |

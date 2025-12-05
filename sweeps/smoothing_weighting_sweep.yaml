@@ -52,18 +52,24 @@ parameters:
   filter_validation:
     value: false
 
-  # Grid search over smoothing and weighting strategies
+  # Search over smoothing and weighting strategies
   use_label_smoothing:
     values: [true, false]
 
   smoothing_factor:
-    values: [0.2, 0.4, 0.6, 0.8]
+    distribution: uniform
+    min: 0.2
+    max: 0.8
 
   use_soft_weighting:
     values: [true, false]
 
   weight_clip_min:
-    values: [0.05, 0.1, 0.2]
+    distribution: uniform
+    min: 0.05
+    max: 0.2
 
   weight_clip_max:
-    values: [5.0, 10.0, 15.0]
+    distribution: uniform
+    min: 5
+    max: 15
