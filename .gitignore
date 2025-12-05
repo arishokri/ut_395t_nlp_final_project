@@ -228,7 +228,7 @@ _dbscan/
 embeddings_output*/
 cluster_output*/
 eval_baseline_emrqa/
-full_analysis_output/
+full_analysis_output*/
 cartography_analysis/
 cartography_output*/
 experiments/
