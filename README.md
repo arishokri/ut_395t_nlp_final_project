@@ -412,7 +412,8 @@ python cluster_analysis.py \
   --embedding_dir ./embeddings_output \
   --output_dir ./cluster_output \
   --reduction_dim 50 \
-  --min_cluster_size 15
+  --min_cluster_size 15 \
+  --min_samples 15
 
 # 3. Integrated analysis (cartography + clustering)
 python analyze_dataset.py \
@@ -427,6 +428,23 @@ python analyze_dataset.py \
 - **Two-stage dimensionality reduction**: PCA (512→50D) for clustering, UMAP (50→2D) for visualization
 - **Cluster quality metrics**: Persistence scores and membership probabilities
 - **Noise detection**: Identifies outliers and anomalous examples
+
+### HDBSCAN Parameters
+
+**`--min_cluster_size`**: Minimum number of points required to form a cluster.
+- **Effect**: Larger values → fewer, larger clusters; smaller values → more, granular clusters
+- **Recommended range**: 0.3-0.5% of dataset size
+  - For ~10K examples: 30-50
+  - For ~30K examples: 100-150
+  - For ~130K examples: 400-650
+
+**`--min_samples`**: Controls clustering strictness and density requirements.
+- **Effect**: Larger values → stricter, more noise points; smaller values → more lenient clustering
+- **Recommended range**: Set equal to `min_cluster_size` for balanced results, or 50-70% of `min_cluster_size` for more clusters
+  - Balanced: `--min_samples = --min_cluster_size`
+  - More clusters: `--min_samples = 0.5 * --min_cluster_size`
+
+**Important**: Both parameters should scale with dataset size for consistent behavior across different data splits.
 
 ## Dataset Filtering
 

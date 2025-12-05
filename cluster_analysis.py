@@ -178,7 +178,12 @@ class ClusterAnalyzer:
 
         print("\nPerforming HDBSCAN clustering...")
         print(f"  min_cluster_size={min_cluster_size}")
-        print(f"  min_samples={min_samples or min_cluster_size}")
+
+        # Use min_cluster_size as default if min_samples not specified
+        if min_samples is None:
+            min_samples = min_cluster_size
+
+        print(f"  min_samples={min_samples}")
         print(f"  metric={metric}")
 
         self.clusterer = hdbscan.HDBSCAN(
