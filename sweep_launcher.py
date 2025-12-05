@@ -51,14 +51,19 @@ def launch_sweep(sweep_config_path: str, project: str = PROJECT_NAME) -> str:
     Returns:
         Sweep ID
     """
+    import yaml
+
     if not os.path.exists(sweep_config_path):
         print(f"Error: Sweep config not found at {sweep_config_path}")
         sys.exit(1)
 
     print(f"Launching sweep from: {sweep_config_path}")
 
-    # Initialize sweep
-    sweep_id = wandb.sweep(sweep=sweep_config_path, project=project)
+    # Load config as dict and initialize sweep
+    with open(sweep_config_path, "r") as f:
+        sweep_config = yaml.safe_load(f)
+
+    sweep_id = wandb.sweep(sweep=sweep_config, project=project)
 
     print(f"\n{'=' * 70}")
     print("Sweep initialized successfully!")
@@ -79,15 +84,21 @@ def run_sweep_agent(sweep_id: str, count: int = 1, project: str = PROJECT_NAME):
     Run a W&B sweep agent.
 
     Args:
-        sweep_id: W&B sweep ID
+        sweep_id: W&B sweep ID (can be just the ID or entity/project/ID)
         count: Number of runs to execute
         project: W&B project name
     """
-    print(f"Starting sweep agent for: {project}/{sweep_id}")
+    # If sweep_id doesn't contain slashes, it's just the ID - need to add entity/project
+    if "/" not in sweep_id:
+        api = wandb.Api()
+        entity = api.default_entity
+        sweep_id = f"{entity}/{project}/{sweep_id}"
+
+    print(f"Starting sweep agent for: {sweep_id}")
     print(f"Will execute {count} run(s)\n")
 
     # Run the agent
-    wandb.agent(sweep_id=sweep_id, project=project, count=count)
+    wandb.agent(sweep_id=sweep_id, count=count)
 
     print(f"\n{'=' * 70}")
     print(f"Sweep agent completed {count} run(s)")

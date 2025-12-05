@@ -4,8 +4,9 @@
 # (cluster filtering does not filter validation set to avoid cluster mismatch)
 
 program: run.py
-method: grid # Exhaustive search over all combinations
+method: bayes # Intelligent search that learns from results
 project: qa-cartography-experiments
+name: filtering-ambig${filter_ambiguous}-clust${filter_clusters}
 
 # Metric to optimize
 # Using F1 instead of exact_match because:
@@ -33,34 +34,12 @@ parameters:
     value: 1000 # null = use full validation set
 
   # Training configuration
-  do_train:
-    value: true
-  do_eval:
-    value: true
   num_train_epochs:
     value: 3
   per_device_train_batch_size:
     value: 64
-  save_strategy:
-    value: epoch
-  evaluation_strategy:
-    value: epoch
-  logging_strategy:
-    value: steps
-  logging_steps:
-    value: 100
-  save_total_limit:
-    value: 2
-  load_best_model_at_end:
-    value: true
-  metric_for_best_model:
-    value: f1
 
-  # W&B reporting
-  report_to:
-    value: wandb
-
-  # Enable cartography tracking for all runs
+  # Cartography and filtering
   enable_cartography:
     value: false
 
@@ -71,45 +50,22 @@ parameters:
 
   # Grid search over filtering strategies
   filter_ambiguous:
-    values: [false, true]
+    values: [true, false]
 
   # Top fraction for ambiguous filtering (only relevant when filter_ambiguous=true)
   ambiguous_top_fraction:
-    distribution: uniform
-    min: 0.25
-    max: 0.70
+    values: [0.25, 0.33, 0.50, 0.70]
 
   # Variability margin for ambiguous classification (only relevant when filter_ambiguous=true)
   variability_margin:
-    distribution: uniform
-    min: -0.05
-    max: 0.05
+    values: [-0.05, 0.0, 0.05]
 
   filter_clusters:
-    values: [false, true]
+    values: [true, false]
 
   # Cluster exclusion parameters (only relevant when filter_clusters=true)
   exclude_noise_cluster:
     values: [true, false]
 
   min_cluster_probability:
-    distribution: uniform
-    min: 0.5
-    max: 0.9
-
-# Output directory pattern
-command:
-  - ${env}
-  - python3
-  - ${program}
-  - ${args_no_hyphens}
-  - --output_dir
-  - ./sweep_outputs/filtering/${id}
-  - --cartography_output_dir
-  - ./cartography_output
-  - --cluster_assignments_path
-  - ./cluster_output
-  - --validation_cartography_output_dir
-  - ./cartography_output_validation
-  # - --validation_cluster_assignments_path
-  # - ./cluster_output_validation
+    values: [0.5, 0.7, 0.9]

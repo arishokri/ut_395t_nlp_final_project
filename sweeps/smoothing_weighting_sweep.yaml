@@ -3,8 +3,9 @@
 # Evaluates on full validation set (no filtering)
 
 program: run.py
-method: grid # Exhaustive search over all combinations
+method: bayes # Intelligent search that learns from results
 project: qa-cartography-experiments
+name: smooth${use_label_smoothing}-weight${use_soft_weighting}
 
 # Metric to optimize
 # Using F1 instead of exact_match because:
@@ -32,32 +33,10 @@ parameters:
     value: 1000 # null = use full validation set
 
   # Training configuration
-  do_train:
-    value: true
-  do_eval:
-    value: true
   num_train_epochs:
     value: 3
   per_device_train_batch_size:
     value: 64
-  save_strategy:
-    value: epoch
-  evaluation_strategy:
-    value: epoch
-  logging_strategy:
-    value: steps
-  logging_steps:
-    value: 100
-  save_total_limit:
-    value: 2
-  load_best_model_at_end:
-    value: true
-  metric_for_best_model:
-    value: f1
-
-  # W&B reporting
-  report_to:
-    value: wandb
 
   # Enable cartography tracking (required for smoothing/weighting)
   enable_cartography:
@@ -75,27 +54,16 @@ parameters:
 
   # Grid search over smoothing and weighting strategies
   use_label_smoothing:
-    values: [false, true]
+    values: [true, false]
 
   smoothing_factor:
     values: [0.2, 0.4, 0.6, 0.8]
 
   use_soft_weighting:
-    values: [false, true]
+    values: [true, false]
 
   weight_clip_min:
     values: [0.05, 0.1, 0.2]
 
   weight_clip_max:
     values: [5.0, 10.0, 15.0]
-
-# Output directory pattern
-command:
-  - ${env}
-  - python3
-  - ${program}
-  - ${args_no_hyphens}
-  - --output_dir
-  - ./sweep_outputs/smoothing_weighting/${id}
-  - --cartography_output_dir
-  - ./cartography_output

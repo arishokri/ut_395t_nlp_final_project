@@ -84,7 +84,8 @@ def main():
     )
     argp.add_argument(
         "--enable_cartography",
-        action="store_true",
+        type=lambda x: x.lower() == "true" if isinstance(x, str) else bool(x),
+        default=False,
         help="Enable dataset cartography tracking during training to identify easy/hard/ambiguous examples.",
     )
     argp.add_argument(
@@ -95,7 +96,8 @@ def main():
     )
     argp.add_argument(
         "--filter_ambiguous",
-        action="store_true",
+        type=lambda x: x.lower() == "true" if isinstance(x, str) else bool(x),
+        default=False,
         help="Filter dataset to remove most ambiguous examples (keeps easy + hard + top fraction of ambiguous based on cartography metrics).",
     )
     argp.add_argument(
@@ -112,7 +114,8 @@ def main():
     )
     argp.add_argument(
         "--filter_clusters",
-        action="store_true",
+        type=lambda x: x.lower() == "true" if isinstance(x, str) else bool(x),
+        default=False,
         help="Filter dataset based on cluster assignments.",
     )
     argp.add_argument(
@@ -123,7 +126,8 @@ def main():
     )
     argp.add_argument(
         "--exclude_noise_cluster",
-        action="store_true",
+        type=lambda x: x.lower() == "true" if isinstance(x, str) else bool(x),
+        default=False,
         help="Exclude noise cluster (-1) from training and validation sets when using cluster filtering.",
     )
     argp.add_argument(
@@ -134,7 +138,8 @@ def main():
     )
     argp.add_argument(
         "--use_label_smoothing",
-        action="store_true",
+        type=lambda x: x.lower() == "true" if isinstance(x, str) else bool(x),
+        default=False,
         help="Enable variability-based label smoothing to reduce overfitting on ambiguous/noisy examples.",
     )
     argp.add_argument(
@@ -145,7 +150,8 @@ def main():
     )
     argp.add_argument(
         "--use_soft_weighting",
-        action="store_true",
+        type=lambda x: x.lower() == "true" if isinstance(x, str) else bool(x),
+        default=False,
         help="Enable soft weight schedule using variability from cartography metrics.",
     )
     argp.add_argument(
@@ -168,7 +174,8 @@ def main():
     )
     argp.add_argument(
         "--filter_validation",
-        action="store_true",
+        type=lambda x: x.lower() == "true" if isinstance(x, str) else bool(x),
+        default=False,
         help="Apply filtering to validation set. Works with --filter_ambiguous, --filter_rule_based, and --filter_clusters.",
     )
     argp.add_argument(
@@ -203,7 +210,8 @@ def main():
     )
     argp.add_argument(
         "--filter_rule_based",
-        action="store_true",
+        type=lambda x: x.lower() == "true" if isinstance(x, str) else bool(x),
+        default=False,
         help="Filter dataset based on rule-based error detection (excludes examples matching the rule).",
     )
     argp.add_argument(
@@ -220,6 +228,30 @@ def main():
     )
 
     training_args, args = argp.parse_args_into_dataclasses()
+
+    # Set required TrainingArguments defaults for sweeps
+    # These need to be set after parsing because wandb passes boolean flags with =True/False
+    # which doesn't work with store_true actions in TrainingArguments
+    if not training_args.do_train:
+        training_args.do_train = True
+    if not training_args.do_eval:
+        training_args.do_eval = True
+    if training_args.eval_strategy == "no":
+        training_args.eval_strategy = "epoch"
+    if training_args.save_strategy == "no":
+        training_args.save_strategy = "epoch"
+    if training_args.logging_strategy == "no":
+        training_args.logging_strategy = "steps"
+    if not training_args.logging_steps:
+        training_args.logging_steps = 100
+    if not training_args.save_total_limit:
+        training_args.save_total_limit = 2
+    if not training_args.load_best_model_at_end:
+        training_args.load_best_model_at_end = True
+    if not training_args.metric_for_best_model:
+        training_args.metric_for_best_model = "f1"
+    if not training_args.report_to:
+        training_args.report_to = ["wandb"]
 
     # Initialize Weights & Biases if enabled
     import wandb

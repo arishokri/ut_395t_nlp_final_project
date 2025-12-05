@@ -4,6 +4,7 @@
 program: run.py
 method: grid
 project: qa-cartography-experiments
+name: baseline-seed-${seed}
 
 # Metric to optimize
 # Using F1 instead of exact_match because:
@@ -31,41 +32,19 @@ parameters:
     value: 1000 # null = use full validation set
 
   # Training configuration
-  do_train:
-    value: true
-  do_eval:
-    value: true
   num_train_epochs:
     value: 3
   per_device_train_batch_size:
     value: 64
-  save_strategy:
-    value: epoch
-  evaluation_strategy:
-    value: epoch
-  logging_strategy:
-    value: steps
-  logging_steps:
-    value: 100
-  save_total_limit:
-    value: 2
-  load_best_model_at_end:
-    value: true
-  metric_for_best_model:
-    value: f1
-
-  # W&B reporting
-  report_to:
-    value: wandb
-
-  # Cartography analysis.
-  enable_cartography:
-    value: false
 
   # No filtering or modifications
-  filter_cartography:
+  enable_cartography:
+    value: false
+  filter_ambiguous:
     value: false
   filter_clusters:
+    value: false
+  filter_rule_based:
     value: false
   filter_validation:
     value: false
@@ -77,18 +56,3 @@ parameters:
   # Multiple seeds for statistical significance
   seed:
     values: [42, 123, 456, 789, 2024]
-
-  # Tag for easy identification
-  wandb_tags:
-    value: "baseline"
-
-# Output directory pattern
-command:
-  - ${env}
-  - python3
-  - ${program}
-  - ${args_no_hyphens}
-  - --output_dir
-  - ./sweep_outputs/baseline/${id}
-  - --cartography_output_dir
-  - ./cartography_output
