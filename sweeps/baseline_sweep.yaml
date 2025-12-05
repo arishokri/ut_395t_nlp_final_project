@@ -29,7 +29,7 @@ parameters:
   max_train_samples:
     value: 5000 # null = use full training set
   max_eval_samples:
-    value: 1000 # null = use full validation set
+    value: 2000 # null = use full validation set
 
   # Training configuration
   num_train_epochs:

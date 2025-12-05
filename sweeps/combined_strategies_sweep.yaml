@@ -30,7 +30,7 @@ parameters:
   max_train_samples:
     value: 5000 # null = use full training set
   max_eval_samples:
-    value: 1000 # null = use full validation set
+    value: 2000 # null = use full validation set
 
   # Training configuration
   num_train_epochs:
@@ -102,6 +102,6 @@ parameters:
 # Early termination for poorly performing runs
 early_terminate:
   type: hyperband
-  min_iter: 3
-  eta: 2
-  s: 2
+  min_iter: 1
+  eta: 3
+  # s: 2
