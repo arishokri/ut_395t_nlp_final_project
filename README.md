@@ -236,7 +236,7 @@ The callback will generate:
 Use the analysis script to explore your results:
 
 ```bash
-python analyze_cartography.py \
+python analyze_dataset.py \
   --cartography_dir ./cartography_output \
   --split train \
   --n_examples 20 \
@@ -247,7 +247,7 @@ This generates:
 
 - **Question type analysis**: How different question types behave
 - **Category samples**: Example questions from each category
-- **Additional visualizations**: Distributions, correlations, breakdowns
+- **Visualizations**: Distributions, correlations, and category breakdowns
 
 ### Curriculum Learning with Cartography
 

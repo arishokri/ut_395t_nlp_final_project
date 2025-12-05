@@ -418,6 +418,52 @@ def create_cartography_plots(cartography_df: pd.DataFrame, output_dir: str):
     print(f"   - Saved confidence vs correctness to {fig_path}")
     plt.close()
 
+    # Category breakdown: Pie chart + Box plot
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+
+    # Pie chart
+    ax = axes[0]
+    category_counts = cartography_df["category"].value_counts()
+    colors_map = {
+        "easy": "green",
+        "hard": "red",
+        "ambiguous": "orange",
+        "easy_variable": "lightgreen",
+    }
+    colors = [colors_map.get(cat, "gray") for cat in category_counts.index]
+
+    ax.pie(
+        category_counts.values,
+        labels=category_counts.index,
+        autopct="%1.1f%%",
+        colors=colors,
+        startangle=90,
+    )
+    ax.set_title("Example Distribution by Category", fontsize=13, fontweight="bold")
+
+    # Box plot
+    ax = axes[1]
+    categories = cartography_df["category"].unique()
+    confidence_by_cat = [
+        cartography_df[cartography_df["category"] == cat]["confidence"].values
+        for cat in categories
+    ]
+
+    bp = ax.boxplot(confidence_by_cat, labels=categories, patch_artist=True)
+    for patch, cat in zip(bp["boxes"], categories):
+        patch.set_facecolor(colors_map.get(cat, "gray"))
+        patch.set_alpha(0.7)
+
+    ax.set_ylabel("Confidence", fontsize=12)
+    ax.set_title("Confidence Distribution by Category", fontsize=13, fontweight="bold")
+    ax.grid(True, alpha=0.3, axis="y")
+
+    plt.tight_layout()
+    fig_path = os.path.join(output_dir, "category_analysis.png")
+    plt.savefig(fig_path, dpi=300, bbox_inches="tight")
+    print(f"   - Saved category analysis to {fig_path}")
+    plt.close()
+
 
 def create_integrated_visualizations(merged_df: pd.DataFrame, output_dir: str):
     """Create integrated visualizations showing both cartography and clustering."""

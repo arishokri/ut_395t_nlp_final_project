@@ -2,11 +2,11 @@
 
 import pandas as pd
 
-from analyze_cartography import (
+from dataset_cartography import (
+    DatasetCartographyCallback,
     categorize_examples,
     load_cartography_metrics,
 )
-from dataset_cartography import DatasetCartographyCallback
 
 
 class TestLoadCartographyMetrics:

@@ -14,7 +14,7 @@ from typing import Dict, List, Optional
 import pandas as pd
 from datasets import Dataset
 
-from analyze_cartography import categorize_examples, load_cartography_metrics
+from dataset_cartography import categorize_examples, load_cartography_metrics
 from cluster_analysis import load_cluster_assignments
 
 
