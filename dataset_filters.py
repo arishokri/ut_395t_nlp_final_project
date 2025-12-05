@@ -71,6 +71,7 @@ class AmbiguousQuestionFilter(DatasetFilter):
         dataset: Dataset,
         metrics_path: str,
         top_fraction: float = 0.33,
+        variability_margin: float = 0.0,
         apply_rule_based_filter: bool = False,
     ):
         """
@@ -80,11 +81,13 @@ class AmbiguousQuestionFilter(DatasetFilter):
             dataset: Dataset to filter
             metrics_path: Path to cartography output directory or CSV file
             top_fraction: Fraction of most ambiguous examples to keep (default: 0.33 = top 33%)
+            variability_margin: Margin to adjust variability threshold (default: 0.0)
             apply_rule_based_filter: If True, also filter non-questions from top ambiguous examples
         """
         super().__init__(dataset)
         self.metrics_path = metrics_path
         self.top_fraction = top_fraction
+        self.variability_margin = variability_margin
         self.apply_rule_based_filter = apply_rule_based_filter
         self.stats = {
             "removed_ambiguous_not_top": 0,
@@ -103,7 +106,9 @@ class AmbiguousQuestionFilter(DatasetFilter):
             cartography_df = self._load_metrics()
 
             # Categorize examples
-            cartography_df = categorize_examples(cartography_df)
+            cartography_df = categorize_examples(
+                cartography_df, variability_margin=self.variability_margin
+            )
 
             # Get ambiguous examples
             ambiguous_df = cartography_df[
@@ -207,6 +212,7 @@ class AmbiguousQuestionFilter(DatasetFilter):
             )
 
 
+# Currenlty not used.
 class CategoryFilter(DatasetFilter):
     """
     Filter dataset to keep only examples from specific cartography categories.
@@ -398,6 +404,107 @@ class ClusterFilter(DatasetFilter):
             )
 
 
+class RuleBasedFilter(DatasetFilter):
+    """
+    Filter dataset based on rule-based error detection.
+
+    Removes examples that match the specified rule (i.e., rule returns True).
+    Supports any rule from rule_based_errors module.
+    """
+
+    def __init__(
+        self,
+        dataset: Dataset,
+        rule_name: str = "low_answer_question_overlap",
+        sim_threshold: float = 0.05,
+    ):
+        """
+        Initialize the rule-based filter.
+
+        Args:
+            dataset: Dataset to filter
+            rule_name: Name of the rule to apply (default: "low_answer_question_overlap")
+            sim_threshold: Similarity threshold for overlap rules (default: 0.05)
+        """
+        super().__init__(dataset)
+        self.rule_name = rule_name
+        self.sim_threshold = sim_threshold
+        self.stats = {"removed_by_rule": 0}
+
+    def apply(self) -> Dataset:
+        """
+        Apply the rule-based filter.
+
+        Returns:
+            Filtered dataset
+        """
+        try:
+            # Import the rule function
+            from rule_based_errors import low_answer_question_overlap
+
+            # Map rule names to functions
+            rule_functions = {
+                "low_answer_question_overlap": low_answer_question_overlap,
+            }
+
+            if self.rule_name not in rule_functions:
+                print(
+                    f"Warning: Unknown rule '{self.rule_name}'. Returning original dataset."
+                )
+                return self.dataset
+
+            rule_func = rule_functions[self.rule_name]
+
+            df = self.dataset.to_pandas()
+            keep_indices = []
+
+            for idx, row in df.iterrows():
+                # Extract answer text from the answers field
+                answer = row.get("answers", {})
+                if isinstance(answer, dict):
+                    answer_texts = answer.get("text", [])
+                    answer_text = answer_texts[0] if answer_texts else ""
+                else:
+                    answer_text = str(answer) if answer else ""
+
+                question = row.get("question", "")
+
+                # Apply rule - if it returns True, we EXCLUDE the example
+                try:
+                    should_filter = rule_func(answer_text, question, self.sim_threshold)
+                    if should_filter:
+                        self.stats["removed_by_rule"] += 1
+                        continue
+                except Exception as e:
+                    # If rule fails, keep the example to be safe
+                    print(f"Warning: Rule failed for example {row.get('id', idx)}: {e}")
+
+                keep_indices.append(idx)
+
+            filtered_df = df.iloc[keep_indices].reset_index(drop=True)
+            filtered_dataset = Dataset.from_pandas(filtered_df)
+
+            self._print_stats(filtered_dataset)
+
+            return filtered_dataset
+
+        except Exception as e:
+            print(f"Error during rule-based filtering: {e}")
+            import traceback
+
+            traceback.print_exc()
+            print("Returning original dataset without filtering...")
+            return self.dataset
+
+    def _print_stats(self, filtered_dataset: Dataset):
+        """Print filtering statistics."""
+        print(f"Original size: {self.original_size}")
+        print(f"Filtered size: {len(filtered_dataset)}")
+        print(f"Removed by {self.rule_name}: {self.stats['removed_by_rule']}")
+        print(f"Similarity threshold: {self.sim_threshold}")
+
+
+# Currenlty not used.
 class ConfidenceThresholdFilter(DatasetFilter):
     """
     Filter dataset based on confidence thresholds.
@@ -538,6 +645,7 @@ def apply_filters(
             dataset=filtered_dataset,
             metrics_path=config["metrics_path"],
             top_fraction=config.get("top_fraction", 0.33),
+            variability_margin=config.get("variability_margin", 0.0),
             apply_rule_based_filter=config.get("apply_rule_based_filter", False),
         )
         filtered_dataset = filter_obj.apply()
@@ -583,6 +691,20 @@ def apply_filters(
             cluster_path=config["cluster_path"],
             exclude_clusters=config.get("exclude_clusters", [-1]),
             min_probability=config.get("min_probability"),
+        )
+        filtered_dataset = filter_obj.apply()
+        print("=" * 70 + "\n")
+
+    # Apply rule-based filter
+    if filter_config.get("rule_based", {}).get("enabled", False):
+        config = filter_config["rule_based"]
+        print("\n" + "=" * 70)
+        print("Applying Rule-Based Filter")
+        print("=" * 70)
+        filter_obj = RuleBasedFilter(
+            dataset=filtered_dataset,
+            rule_name=config.get("rule_name", "low_answer_question_overlap"),
+            sim_threshold=config.get("sim_threshold", 0.05),
         )
         filtered_dataset = filter_obj.apply()
         print("=" * 70 + "\n")

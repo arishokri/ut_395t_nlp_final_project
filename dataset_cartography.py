@@ -397,6 +397,7 @@ def categorize_examples(
     df: pd.DataFrame,
     conf_threshold: Optional[float] = None,
     var_threshold: Optional[float] = None,
+    variability_margin: float = 0.0,
 ) -> pd.DataFrame:
     """
     Categorize examples as easy, hard, or ambiguous.
@@ -405,6 +406,9 @@ def categorize_examples(
         df: DataFrame with cartography metrics
         conf_threshold: Confidence threshold (default: median)
         var_threshold: Variability threshold (default: median)
+        variability_margin: Margin to adjust variability threshold (default: 0.0).
+                          Positive values increase threshold (fewer ambiguous),
+                          negative values decrease threshold (more ambiguous).
 
     Returns:
         DataFrame with added 'category' column
@@ -413,6 +417,9 @@ def categorize_examples(
         conf_threshold = df["confidence"].median()
     if var_threshold is None:
         var_threshold = df["variability"].median()
+    
+    # Apply variability margin adjustment
+    var_threshold = var_threshold + variability_margin
 
     def categorize(row):
         if row["variability"] <= var_threshold:

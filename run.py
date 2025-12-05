@@ -93,10 +93,24 @@ def main():
         default="./cartography_output",
         help="Directory for cartography outputs. Used for: saving training dynamics (--enable_cartography), filtering (--filter_cartography), label smoothing (--use_label_smoothing), and soft weighting (--use_soft_weighting).",
     )
+    #! Rename cartography to ambiguous
     argp.add_argument(
         "--filter_cartography",
         action="store_true",
         help="Filter dataset based on cartography metrics (removes ambiguous examples).",
+    )
+    #! Rename cartography to ambiguous
+    argp.add_argument(
+        "--cartography_top_fraction",
+        type=float,
+        default=0.33,
+        help="Fraction of most ambiguous examples to keep when using cartography filtering (default: 0.33 = top 33%%).",
+    )
+    argp.add_argument(
+        "--variability_margin",
+        type=float,
+        default=0.0,
+        help="Margin to shift variability threshold for ambiguous classification (default: 0.0). Positive values make classification more strict (fewer ambiguous examples), negative values make it more lenient (more ambiguous examples).",
     )
     argp.add_argument(
         "--filter_clusters",
@@ -107,20 +121,18 @@ def main():
         "--cluster_assignments_path",
         type=str,
         default="./cluster_output",
-        help="Path to cluster assignments directory or CSV file.",
+        help="Path to cluster assignments directory or CSV file for training set.",
     )
     argp.add_argument(
-        "--exclude_clusters",
-        type=str,
-        default="-1",
-        help="Comma-separated list of cluster IDs to exclude (e.g., '3,4,-1'). Default: '-1' (excludes noise). Use --exclude_clusters=\"-1,1\" when including negative numbers.",
+        "--exclude_noise_cluster",
+        action="store_true",
+        help="Exclude noise cluster (-1) from training and validation sets when using cluster filtering.",
     )
-
     argp.add_argument(
         "--min_cluster_probability",
         type=float,
         default=None,
-        help="Minimum cluster probability threshold for filtering (0.0-1.0).",
+        help="Minimum cluster probability threshold for filtering (0.0-1.0). Applied to both train and validation sets.",
     )
     argp.add_argument(
         "--use_label_smoothing",
@@ -159,7 +171,7 @@ def main():
     argp.add_argument(
         "--filter_validation",
         action="store_true",
-        help="Apply cartography filtering to validation set. Note: Only applies when --filter_cartography is enabled (not used with --filter_clusters).",
+        help="Apply filtering to validation set. Works with --filter_cartography, --filter_rule_based, and --filter_clusters.",
     )
     argp.add_argument(
         "--validation_cartography_output_dir",
@@ -191,6 +203,23 @@ def main():
         default=None,
         help="Comma-separated tags for W&B run (e.g., 'baseline,filtered,smoothing').",
     )
+    argp.add_argument(
+        "--filter_rule_based",
+        action="store_true",
+        help="Filter dataset based on rule-based error detection (excludes examples matching the rule).",
+    )
+    argp.add_argument(
+        "--rule_name",
+        type=str,
+        default="low_answer_question_overlap",
+        help="Name of the rule to apply for filtering (default: 'low_answer_question_overlap').",
+    )
+    argp.add_argument(
+        "--rule_sim_threshold",
+        type=float,
+        default=0.05,
+        help="Similarity threshold for low_answer_question_overlap (default: 0.05).",
+    )
 
     training_args, args = argp.parse_args_into_dataclasses()
 
@@ -213,7 +242,8 @@ def main():
             if args.filter_cartography:
                 name_parts.append("cart_filt")
             if args.filter_clusters:
-                name_parts.append(f"clust_filt_excl{args.exclude_clusters}")
+                noise_suffix = "_excl_noise" if args.exclude_noise_cluster else ""
+                name_parts.append(f"clust_filt{noise_suffix}")
             if args.use_label_smoothing:
                 name_parts.append(f"smooth{args.smoothing_factor}")
             if args.use_soft_weighting:
@@ -241,10 +271,15 @@ def main():
                 "seed": training_args.seed,
                 # Filtering strategies
                 "filter_cartography": args.filter_cartography,
+                "cartography_top_fraction": args.cartography_top_fraction,
+                "variability_margin": args.variability_margin,
                 "filter_clusters": args.filter_clusters,
-                "exclude_clusters": args.exclude_clusters,
+                "filter_rule_based": args.filter_rule_based,
+                "exclude_noise_cluster": args.exclude_noise_cluster,
                 "min_cluster_probability": args.min_cluster_probability,
                 "filter_validation": args.filter_validation,
+                "rule_name": args.rule_name,
+                "rule_sim_threshold": args.rule_sim_threshold,
                 # Training modifications
                 "use_label_smoothing": args.use_label_smoothing,
                 "smoothing_factor": args.smoothing_factor,
@@ -335,7 +370,8 @@ def main():
                 "ambiguous": {
                     "enabled": True,
                     "metrics_path": args.cartography_output_dir,
-                    "top_fraction": 0.33,
+                    "top_fraction": args.cartography_top_fraction,
+                    "variability_margin": args.variability_margin,
                     "apply_rule_based_filter": False,
                 }
             }
@@ -365,6 +401,52 @@ def main():
                     }
                 )
 
+        # Apply rule-based filtering if requested
+        if args.filter_rule_based:
+            print(f"\n{'=' * 70}")
+            print("APPLYING RULE-BASED FILTERING")
+            print(f"{'=' * 70}")
+            print(f"Rule: {args.rule_name}")
+            print(f"Similarity threshold: {args.rule_sim_threshold}")
+
+            original_size = len(train_dataset)
+
+            # Create filter configuration
+            filter_config = {
+                "rule_based": {
+                    "enabled": True,
+                    "rule_name": args.rule_name,
+                    "sim_threshold": args.rule_sim_threshold,
+                }
+            }
+
+            # Apply filters
+            train_dataset = apply_filters(train_dataset, filter_config)
+
+            filtered_size = len(train_dataset)
+            removed_count = original_size - filtered_size
+
+            print("\nRule-Based Filtering Summary:")
+            print(f"  Original size: {original_size}")
+            print(f"  Filtered size: {filtered_size}")
+            print(
+                f"  Removed: {removed_count} examples ({removed_count / original_size * 100:.1f}%)"
+            )
+            print(f"{'=' * 70}\n")
+
+            # Log to wandb
+            if wandb_enabled:
+                wandb.log(
+                    {
+                        "train/rule_original_size": original_size,
+                        "train/rule_filtered_size": filtered_size,
+                        "train/rule_removed_count": removed_count,
+                        "train/rule_removal_percentage": removed_count
+                        / original_size
+                        * 100,
+                    }
+                )
+
         # Apply cluster filtering if requested
         if args.filter_clusters:
             if args.cluster_assignments_path is None:
@@ -382,12 +464,8 @@ def main():
 
                 original_size = len(train_dataset)
 
-                # Parse exclude_clusters list (empty string means exclude nothing)
-                exclude_clusters = []
-                if args.exclude_clusters.strip():  # Only parse if not empty
-                    exclude_clusters = [
-                        int(c.strip()) for c in args.exclude_clusters.split(",")
-                    ]
+                # Determine which clusters to exclude
+                exclude_clusters = [-1] if args.exclude_noise_cluster else []
 
                 # Create cluster filter configuration
                 filter_config = {
@@ -411,6 +489,10 @@ def main():
                 print(
                     f"  Removed: {removed_count} examples ({removed_count / original_size * 100:.1f}%)"
                 )
+                if args.exclude_noise_cluster:
+                    print("  Excluded noise cluster: -1")
+                if args.min_cluster_probability:
+                    print(f"  Min cluster probability: {args.min_cluster_probability}")
                 print(f"{'=' * 70}\n")
 
                 # Log to wandb
@@ -438,10 +520,12 @@ def main():
             eval_dataset = eval_dataset.select(range(args.max_eval_samples))
 
         # Apply filtering to validation set if requested
-        # Note: Only filter validation when using cartography filtering, not cluster filtering
-        if args.filter_validation and args.filter_cartography:
+        # Note: filter_validation works with all filtering strategies
+        if args.filter_validation and (
+            args.filter_cartography or args.filter_rule_based or args.filter_clusters
+        ):
             print(f"\n{'=' * 70}")
-            print("APPLYING CARTOGRAPHY FILTERS TO VALIDATION SET")
+            print("APPLYING FILTERS TO VALIDATION SET")
             print(f"{'=' * 70}")
 
             original_eval_size = len(eval_dataset)
@@ -453,16 +537,57 @@ def main():
                 else args.cartography_output_dir
             )
 
-            # Build filter config for validation (only cartography, not clusters)
+            # Build filter config for validation
             val_filter_config = {}
 
-            val_filter_config["ambiguous"] = {
-                "enabled": True,
-                "metrics_path": val_cartography_dir,
-                "top_fraction": 0.33,
-                "apply_rule_based_filter": False,
-            }
-            print(f"  Cartography metrics from: {val_cartography_dir}")
+            # Add cartography filtering if enabled
+            if args.filter_cartography:
+                val_filter_config["ambiguous"] = {
+                    "enabled": True,
+                    "metrics_path": val_cartography_dir,
+                    "top_fraction": args.cartography_top_fraction,
+                    "variability_margin": args.variability_margin,
+                    "apply_rule_based_filter": False,
+                }
+                print(f"  Cartography metrics from: {val_cartography_dir}")
+                print(f"  Top fraction: {args.cartography_top_fraction}")
+                print(f"  Variability margin: {args.variability_margin}")
+
+            # Add rule-based filtering if enabled
+            if args.filter_rule_based:
+                val_filter_config["rule_based"] = {
+                    "enabled": True,
+                    "rule_name": args.rule_name,
+                    "sim_threshold": args.rule_sim_threshold,
+                }
+                print(
+                    f"  Rule-based filter: {args.rule_name} (threshold: {args.rule_sim_threshold})"
+                )
+
+            # Add cluster filtering if enabled
+            if args.filter_clusters:
+                # Only apply cluster filtering to validation if explicit path is provided
+                if args.validation_cluster_assignments_path:
+                    exclude_clusters = [-1] if args.exclude_noise_cluster else []
+                    val_filter_config["cluster"] = {
+                        "enabled": True,
+                        "cluster_path": args.validation_cluster_assignments_path,
+                        "exclude_clusters": exclude_clusters,
+                        "min_probability": args.min_cluster_probability,
+                    }
+                    print(
+                        f"  Cluster assignments from: {args.validation_cluster_assignments_path}"
+                    )
+                    if args.exclude_noise_cluster:
+                        print("  Excluding noise cluster: -1")
+                    if args.min_cluster_probability:
+                        print(
+                            f"  Min cluster probability: {args.min_cluster_probability}"
+                        )
+                else:
+                    print(
+                        "  Warning: Skipping cluster filtering for validation (no --validation_cluster_assignments_path provided)"
+                    )
 
             # Apply filters to validation set
             if val_filter_config:

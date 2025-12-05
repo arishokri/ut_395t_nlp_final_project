@@ -172,8 +172,22 @@ def rule2_multi_clause(answer_text):
     return len(informative) > 1
 
 
-def rule3_low_question_similarity(answer_text, question, sim_threshold=0.05):
-    """Gold span has very low lexical overlap with question."""
+def low_answer_question_overlap(answer_text, question, sim_threshold=0.05):
+    """
+    Detect answers with very low lexical overlap with the question.
+
+    This rule identifies potentially noisy question-answer pairs where the answer
+    has minimal word overlap with the question, suggesting poor alignment or
+    annotation errors.
+
+    Args:
+        answer_text: The gold answer text
+        question: The question text
+        sim_threshold: Minimum Jaccard similarity threshold (default: 0.05)
+
+    Returns:
+        True if the answer should be filtered out (overlap < threshold)
+    """
     overlap = jaccard_overlap(answer_text, question)
     return overlap < sim_threshold
 
@@ -259,7 +273,7 @@ def compute_dataset_error_flags(row, length_threshold):
 
     r1 = rule1_length_anomaly(gold, length_threshold)
     r2 = rule2_multi_clause(gold)
-    r3 = rule3_low_question_similarity(gold, q)
+    r3 = low_answer_question_overlap(gold, q)
     r4 = rule4_pred_inside_gold_better_alignment(pred, gold, q)
     r5 = rule5_question_type_mismatch(gold, q)
     r6 = rule6_multiple_occurrences_in_context(gold, ctx)

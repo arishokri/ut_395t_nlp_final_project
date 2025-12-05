@@ -476,8 +476,23 @@ python run.py \
   --num_train_epochs 3 \
   --filter_cartography \
   --cartography_output_dir ./cartography_output \
+  --cartography_top_fraction 0.33 \
+  --variability_margin 0.0 \
   --output_dir ./filtered_model
 ```
+
+**Cartography Filtering Parameters:**
+
+- `--filter_cartography`: Enable cartography-based filtering
+- `--cartography_output_dir`: Path to cartography metrics directory
+- `--cartography_top_fraction`: Fraction of most ambiguous examples to keep (default: 0.33)
+  - 0.33 = keep top 33% of ambiguous examples
+  - Lower values = more aggressive filtering (fewer ambiguous kept)
+  - Higher values = more lenient filtering (more ambiguous kept)
+- `--variability_margin`: Margin to adjust variability threshold for ambiguous classification (default: 0.0)
+  - Positive values (e.g., 0.05) = stricter classification, fewer examples marked as ambiguous
+  - Negative values (e.g., -0.05) = more lenient classification, more examples marked as ambiguous
+  - The threshold is: `median(variability) + variability_margin`
 
 ### Cluster-Based Filtering
 
@@ -488,13 +503,13 @@ python run.py \
   --do_train \
   --filter_clusters \
   --cluster_assignments_path ./cluster_output \
-  --exclude_clusters "-1,3,5" \
+  --exclude_noise_cluster \
   --min_cluster_probability 0.7
 ```
 
 - `--filter_clusters`: Enable cluster-based filtering
 - `--cluster_assignments_path`: Path to cluster output directory
-- `--exclude_clusters`: Comma-separated cluster IDs to remove (default: "-1" for noise)
+- `--exclude_noise_cluster`: Exclude noise cluster (-1) from training/validation
 - `--min_cluster_probability`: Minimum membership probability threshold
 
 ### Combined Filtering
@@ -505,10 +520,13 @@ Apply both cartography and cluster filtering:
 python run.py \
   --do_train \
   --filter_cartography \
+  --cartography_top_fraction 0.5 \
+  --variability_margin 0.05 \
   --filter_clusters \
   --cartography_output_dir ./cartography_output \
   --cluster_assignments_path ./cluster_output \
-  --exclude_clusters "-1" \
+  --exclude_noise_cluster \
+  --filter_validation \
   --output_dir ./clean_model
 ```
 

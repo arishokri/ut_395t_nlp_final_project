@@ -79,6 +79,24 @@ class TestCategorizeExamples:
             # Ambiguous examples should have higher variability
             assert ambiguous_examples["variability"].mean() > 0.3
 
+    def test_variability_margin_affects_categorization(self, sample_cartography_metrics):
+        """Test that variability_margin changes example categorization."""
+        df = load_cartography_metrics(sample_cartography_metrics)
+        
+        # Categorize with positive margin (stricter)
+        categorized_strict = categorize_examples(df, variability_margin=0.1)
+        
+        # Categorize with negative margin (more lenient)
+        categorized_lenient = categorize_examples(df, variability_margin=-0.1)
+        
+        # With positive margin, threshold is higher, so fewer examples are ambiguous
+        # (more examples fall below the threshold -> easy or hard)
+        strict_ambiguous = (categorized_strict["category"] == "ambiguous").sum()
+        lenient_ambiguous = (categorized_lenient["category"] == "ambiguous").sum()
+        
+        # Lenient should have more or equal ambiguous examples
+        assert lenient_ambiguous >= strict_ambiguous
+
 
 class TestDatasetCartographyCallback:
     """Test suite for DatasetCartographyCallback."""

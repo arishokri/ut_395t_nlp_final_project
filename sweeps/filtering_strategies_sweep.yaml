@@ -73,16 +73,28 @@ parameters:
   filter_cartography:
     values: [false, true]
 
+  # Top fraction for cartography filtering (only relevant when filter_cartography=true)
+  cartography_top_fraction:
+    distribution: uniform
+    min: 0.25
+    max: 0.70
+
+  # Variability margin for ambiguous classification (only relevant when filter_cartography=true)
+  variability_margin:
+    distribution: uniform
+    min: -0.05
+    max: 0.05
+
   filter_clusters:
     values: [false, true]
 
   # Cluster exclusion parameters (only relevant when filter_clusters=true)
-  exclude_clusters:
-    values: ["-1", "1", "2", "1, 2", "-1, 1", "-1, 2", "-1, 1, 2"]
+  exclude_noise_cluster:
+    values: [true, false]
 
   min_cluster_probability:
     distribution: uniform
-    min: 0.3
+    min: 0.5
     max: 0.9
 
 # Output directory pattern

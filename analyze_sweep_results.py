@@ -59,7 +59,7 @@ def extract_run_metrics(run: wandb.apis.public.Run) -> Dict:
         # Filtering strategies
         "filter_cartography": config.get("filter_cartography", False),
         "filter_clusters": config.get("filter_clusters", False),
-        "exclude_clusters": config.get("exclude_clusters", "N/A"),
+        "exclude_noise_cluster": config.get("exclude_noise_cluster", False),
         "min_cluster_probability": config.get("min_cluster_probability", "N/A"),
         "filter_validation": config.get("filter_validation", False),
         # Training modifications

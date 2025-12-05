@@ -28,7 +28,7 @@ This comprehensive test suite replaces the `demos/` directory with proper pytest
 
 - `--filter_cartography`
 - `--filter_clusters`
-- `--exclude_clusters`
+- `--exclude_noise_cluster`
 - `--min_cluster_probability`
 
 ### 3. `test_helpers.py` - Helper Function Tests
@@ -133,7 +133,7 @@ This comprehensive test suite replaces the `demos/` directory with proper pytest
 | `--filter_cartography`                  | ✅     | test_dataset_filters.py, test_run_integration.py  |
 | `--filter_clusters`                     | ✅     | test_dataset_filters.py, test_run_integration.py  |
 | `--cluster_assignments_path`            | ✅     | test_cluster_analysis.py, test_run_integration.py |
-| `--exclude_clusters`                    | ✅     | test_dataset_filters.py, test_run_integration.py  |
+| `--exclude_noise_cluster`               | ✅     | test_dataset_filters.py, test_run_integration.py  |
 | `--min_cluster_probability`             | ✅     | test_dataset_filters.py, test_run_integration.py  |
 | `--use_label_smoothing`                 | ✅     | test_run_integration.py                           |
 | `--smoothing_factor`                    | ✅     | test_run_integration.py                           |

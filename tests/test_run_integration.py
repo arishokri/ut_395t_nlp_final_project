@@ -17,7 +17,7 @@ class TestRunBaseline:
             capture_output=True,
             text=True,
         )
-        
+
         # Should exit successfully
         assert result.returncode in [0, 1]  # May fail due to missing args
         # Help text should mention key arguments
@@ -27,17 +27,25 @@ class TestRunBaseline:
         """Test baseline configuration (dry run - no actual training)."""
         # This test validates argument parsing without actually training
         cmd = [
-            sys.executable, "run.py",
-            "--output_dir", str(temp_dir / "baseline_test"),
+            sys.executable,
+            "run.py",
+            "--output_dir",
+            str(temp_dir / "baseline_test"),
             "--do_train",
-            "--num_train_epochs", "1",
-            "--per_device_train_batch_size", "2",
-            "--max_train_samples", "10",
-            "--save_strategy", "no",
-            "--eval_strategy", "no",
-            "--report_to", "none",
+            "--num_train_epochs",
+            "1",
+            "--per_device_train_batch_size",
+            "2",
+            "--max_train_samples",
+            "10",
+            "--save_strategy",
+            "no",
+            "--eval_strategy",
+            "no",
+            "--report_to",
+            "none",
         ]
-        
+
         # Note: This will likely fail without GPU/proper setup, but we test argument parsing
         result = subprocess.run(
             cmd,
@@ -45,7 +53,7 @@ class TestRunBaseline:
             text=True,
             timeout=30,
         )
-        
+
         # We mainly care that arguments are parsed correctly
         # Actual training may fail due to environment
         assert "error: unrecognized arguments" not in result.stderr
@@ -57,25 +65,33 @@ class TestRunWithCartography:
     def test_cartography_arguments_parsing(self, temp_dir):
         """Test that cartography arguments are recognized."""
         cmd = [
-            sys.executable, "run.py",
-            "--output_dir", str(temp_dir / "cartography_test"),
+            sys.executable,
+            "run.py",
+            "--output_dir",
+            str(temp_dir / "cartography_test"),
             "--do_train",
-            "--num_train_epochs", "1",
+            "--num_train_epochs",
+            "1",
             "--enable_cartography",
-            "--cartography_output_dir", str(temp_dir / "cartography_output"),
-            "--max_train_samples", "10",
-            "--save_strategy", "no",
-            "--eval_strategy", "no",
-            "--report_to", "none",
+            "--cartography_output_dir",
+            str(temp_dir / "cartography_output"),
+            "--max_train_samples",
+            "10",
+            "--save_strategy",
+            "no",
+            "--eval_strategy",
+            "no",
+            "--report_to",
+            "none",
         ]
-        
+
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
             timeout=30,
         )
-        
+
         # Arguments should be recognized
         assert "error: unrecognized arguments" not in result.stderr
         assert "--enable_cartography" not in result.stderr
@@ -83,24 +99,35 @@ class TestRunWithCartography:
     def test_cartography_filter_arguments(self, temp_dir):
         """Test cartography filtering arguments."""
         cmd = [
-            sys.executable, "run.py",
-            "--output_dir", str(temp_dir / "filter_test"),
+            sys.executable,
+            "run.py",
+            "--output_dir",
+            str(temp_dir / "filter_test"),
             "--do_train",
             "--filter_cartography",
-            "--cartography_output_dir", str(temp_dir / "cartography_output"),
-            "--max_train_samples", "10",
-            "--save_strategy", "no",
-            "--eval_strategy", "no",
-            "--report_to", "none",
+            "--cartography_output_dir",
+            str(temp_dir / "cartography_output"),
+            "--cartography_top_fraction",
+            "0.5",
+            "--variability_margin",
+            "0.05",
+            "--max_train_samples",
+            "10",
+            "--save_strategy",
+            "no",
+            "--eval_strategy",
+            "no",
+            "--report_to",
+            "none",
         ]
-        
+
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
             timeout=30,
         )
-        
+
         assert "error: unrecognized arguments" not in result.stderr
 
 
@@ -110,49 +137,64 @@ class TestRunWithClusters:
     def test_cluster_filter_arguments(self, temp_dir):
         """Test cluster filtering arguments."""
         cmd = [
-            sys.executable, "run.py",
-            "--output_dir", str(temp_dir / "cluster_test"),
+            sys.executable,
+            "run.py",
+            "--output_dir",
+            str(temp_dir / "cluster_test"),
             "--do_train",
             "--filter_clusters",
-            "--cluster_assignments_path", str(temp_dir / "cluster_output"),
-            "--exclude_clusters", "-1",
-            "--max_train_samples", "10",
-            "--save_strategy", "no",
-            "--eval_strategy", "no",
-            "--report_to", "none",
+            "--cluster_assignments_path",
+            str(temp_dir / "cluster_output"),
+            "--exclude_noise_cluster",
+            "--max_train_samples",
+            "10",
+            "--save_strategy",
+            "no",
+            "--eval_strategy",
+            "no",
+            "--report_to",
+            "none",
         ]
-        
+
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
             timeout=30,
         )
-        
+
         assert "error: unrecognized arguments" not in result.stderr
 
     def test_cluster_probability_threshold(self, temp_dir):
         """Test cluster probability threshold argument."""
         cmd = [
-            sys.executable, "run.py",
-            "--output_dir", str(temp_dir / "cluster_prob_test"),
+            sys.executable,
+            "run.py",
+            "--output_dir",
+            str(temp_dir / "cluster_prob_test"),
             "--do_train",
             "--filter_clusters",
-            "--cluster_assignments_path", str(temp_dir / "cluster_output"),
-            "--min_cluster_probability", "0.8",
-            "--max_train_samples", "10",
-            "--save_strategy", "no",
-            "--eval_strategy", "no",
-            "--report_to", "none",
+            "--cluster_assignments_path",
+            str(temp_dir / "cluster_output"),
+            "--min_cluster_probability",
+            "0.8",
+            "--max_train_samples",
+            "10",
+            "--save_strategy",
+            "no",
+            "--eval_strategy",
+            "no",
+            "--report_to",
+            "none",
         ]
-        
+
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
             timeout=30,
         )
-        
+
         assert "error: unrecognized arguments" not in result.stderr
 
 
@@ -162,25 +204,33 @@ class TestRunWithLabelSmoothing:
     def test_label_smoothing_arguments(self, temp_dir):
         """Test label smoothing arguments."""
         cmd = [
-            sys.executable, "run.py",
-            "--output_dir", str(temp_dir / "smoothing_test"),
+            sys.executable,
+            "run.py",
+            "--output_dir",
+            str(temp_dir / "smoothing_test"),
             "--do_train",
             "--use_label_smoothing",
-            "--smoothing_factor", "0.6",
-            "--cartography_output_dir", str(temp_dir / "cartography_output"),
-            "--max_train_samples", "10",
-            "--save_strategy", "no",
-            "--eval_strategy", "no",
-            "--report_to", "none",
+            "--smoothing_factor",
+            "0.6",
+            "--cartography_output_dir",
+            str(temp_dir / "cartography_output"),
+            "--max_train_samples",
+            "10",
+            "--save_strategy",
+            "no",
+            "--eval_strategy",
+            "no",
+            "--report_to",
+            "none",
         ]
-        
+
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
             timeout=30,
         )
-        
+
         assert "error: unrecognized arguments" not in result.stderr
 
 
@@ -190,26 +240,35 @@ class TestRunWithSoftWeighting:
     def test_soft_weighting_arguments(self, temp_dir):
         """Test soft weighting arguments."""
         cmd = [
-            sys.executable, "run.py",
-            "--output_dir", str(temp_dir / "weighting_test"),
+            sys.executable,
+            "run.py",
+            "--output_dir",
+            str(temp_dir / "weighting_test"),
             "--do_train",
             "--use_soft_weighting",
-            "--weight_clip_min", "0.1",
-            "--weight_clip_max", "10.0",
-            "--cartography_output_dir", str(temp_dir / "cartography_output"),
-            "--max_train_samples", "10",
-            "--save_strategy", "no",
-            "--eval_strategy", "no",
-            "--report_to", "none",
+            "--weight_clip_min",
+            "0.1",
+            "--weight_clip_max",
+            "10.0",
+            "--cartography_output_dir",
+            str(temp_dir / "cartography_output"),
+            "--max_train_samples",
+            "10",
+            "--save_strategy",
+            "no",
+            "--eval_strategy",
+            "no",
+            "--report_to",
+            "none",
         ]
-        
+
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
             timeout=30,
         )
-        
+
         assert "error: unrecognized arguments" not in result.stderr
 
 
@@ -219,52 +278,68 @@ class TestRunCombinedStrategies:
     def test_cartography_and_cluster_filtering(self, temp_dir):
         """Test combining cartography and cluster filtering."""
         cmd = [
-            sys.executable, "run.py",
-            "--output_dir", str(temp_dir / "combined_test"),
+            sys.executable,
+            "run.py",
+            "--output_dir",
+            str(temp_dir / "combined_test"),
             "--do_train",
             "--filter_cartography",
-            "--cartography_output_dir", str(temp_dir / "cartography_output"),
+            "--cartography_output_dir",
+            str(temp_dir / "cartography_output"),
             "--filter_clusters",
-            "--cluster_assignments_path", str(temp_dir / "cluster_output"),
-            "--exclude_clusters", "-1",
-            "--max_train_samples", "10",
-            "--save_strategy", "no",
-            "--eval_strategy", "no",
-            "--report_to", "none",
+            "--cluster_assignments_path",
+            str(temp_dir / "cluster_output"),
+            "--exclude_noise_cluster",
+            "--max_train_samples",
+            "10",
+            "--save_strategy",
+            "no",
+            "--eval_strategy",
+            "no",
+            "--report_to",
+            "none",
         ]
-        
+
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
             timeout=30,
         )
-        
+
         assert "error: unrecognized arguments" not in result.stderr
 
     def test_filtering_with_smoothing(self, temp_dir):
         """Test combining filtering with label smoothing."""
         cmd = [
-            sys.executable, "run.py",
-            "--output_dir", str(temp_dir / "filter_smooth_test"),
+            sys.executable,
+            "run.py",
+            "--output_dir",
+            str(temp_dir / "filter_smooth_test"),
             "--do_train",
             "--filter_cartography",
             "--use_label_smoothing",
-            "--smoothing_factor", "0.5",
-            "--cartography_output_dir", str(temp_dir / "cartography_output"),
-            "--max_train_samples", "10",
-            "--save_strategy", "no",
-            "--eval_strategy", "no",
-            "--report_to", "none",
+            "--smoothing_factor",
+            "0.5",
+            "--cartography_output_dir",
+            str(temp_dir / "cartography_output"),
+            "--max_train_samples",
+            "10",
+            "--save_strategy",
+            "no",
+            "--eval_strategy",
+            "no",
+            "--report_to",
+            "none",
         ]
-        
+
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
             timeout=30,
         )
-        
+
         assert "error: unrecognized arguments" not in result.stderr
 
 
@@ -274,45 +349,59 @@ class TestRunAblations:
     def test_question_only_ablation(self, temp_dir):
         """Test question-only ablation."""
         cmd = [
-            sys.executable, "run.py",
-            "--output_dir", str(temp_dir / "q_only_test"),
+            sys.executable,
+            "run.py",
+            "--output_dir",
+            str(temp_dir / "q_only_test"),
             "--do_train",
-            "--ablations", "q_only",
-            "--max_train_samples", "10",
-            "--save_strategy", "no",
-            "--eval_strategy", "no",
-            "--report_to", "none",
+            "--ablations",
+            "q_only",
+            "--max_train_samples",
+            "10",
+            "--save_strategy",
+            "no",
+            "--eval_strategy",
+            "no",
+            "--report_to",
+            "none",
         ]
-        
+
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
             timeout=30,
         )
-        
+
         assert "error: unrecognized arguments" not in result.stderr
 
     def test_passage_only_ablation(self, temp_dir):
         """Test passage-only ablation."""
         cmd = [
-            sys.executable, "run.py",
-            "--output_dir", str(temp_dir / "p_only_test"),
+            sys.executable,
+            "run.py",
+            "--output_dir",
+            str(temp_dir / "p_only_test"),
             "--do_train",
-            "--ablations", "p_only",
-            "--max_train_samples", "10",
-            "--save_strategy", "no",
-            "--eval_strategy", "no",
-            "--report_to", "none",
+            "--ablations",
+            "p_only",
+            "--max_train_samples",
+            "10",
+            "--save_strategy",
+            "no",
+            "--eval_strategy",
+            "no",
+            "--report_to",
+            "none",
         ]
-        
+
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
             timeout=30,
         )
-        
+
         assert "error: unrecognized arguments" not in result.stderr
 
 
@@ -322,51 +411,70 @@ class TestRunValidationFiltering:
     def test_validation_cartography_filtering(self, temp_dir):
         """Test filtering validation set with cartography."""
         cmd = [
-            sys.executable, "run.py",
-            "--output_dir", str(temp_dir / "val_filter_test"),
+            sys.executable,
+            "run.py",
+            "--output_dir",
+            str(temp_dir / "val_filter_test"),
             "--do_train",
             "--filter_cartography",
             "--filter_validation",
-            "--cartography_output_dir", str(temp_dir / "cartography_output"),
-            "--validation_cartography_output_dir", str(temp_dir / "cartography_output_val"),
-            "--max_train_samples", "10",
-            "--max_eval_samples", "10",
-            "--save_strategy", "no",
-            "--eval_strategy", "no",
-            "--report_to", "none",
+            "--cartography_output_dir",
+            str(temp_dir / "cartography_output"),
+            "--validation_cartography_output_dir",
+            str(temp_dir / "cartography_output_val"),
+            "--max_train_samples",
+            "10",
+            "--max_eval_samples",
+            "10",
+            "--save_strategy",
+            "no",
+            "--eval_strategy",
+            "no",
+            "--report_to",
+            "none",
         ]
-        
+
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
             timeout=30,
         )
-        
+
         assert "error: unrecognized arguments" not in result.stderr
 
     def test_validation_cluster_filtering(self, temp_dir):
         """Test filtering validation set with clusters."""
         cmd = [
-            sys.executable, "run.py",
-            "--output_dir", str(temp_dir / "val_cluster_test"),
+            sys.executable,
+            "run.py",
+            "--output_dir",
+            str(temp_dir / "val_cluster_test"),
             "--do_train",
             "--filter_clusters",
-            "--cluster_assignments_path", str(temp_dir / "cluster_output"),
-            "--validation_cluster_assignments_path", str(temp_dir / "cluster_output_val"),
-            "--exclude_clusters", "-1",
-            "--max_train_samples", "10",
-            "--max_eval_samples", "10",
-            "--save_strategy", "no",
-            "--eval_strategy", "no",
-            "--report_to", "none",
+            "--cluster_assignments_path",
+            str(temp_dir / "cluster_output"),
+            "--validation_cluster_assignments_path",
+            str(temp_dir / "cluster_output_val"),
+            "--exclude_noise_cluster",
+            "--filter_validation",
+            "--max_train_samples",
+            "10",
+            "--max_eval_samples",
+            "10",
+            "--save_strategy",
+            "no",
+            "--eval_strategy",
+            "no",
+            "--report_to",
+            "none",
         ]
-        
+
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
             timeout=30,
         )
-        
+
         assert "error: unrecognized arguments" not in result.stderr

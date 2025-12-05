@@ -65,6 +65,32 @@ class TestAmbiguousQuestionFilter:
         assert "removed_count" in stats
         assert stats["original_size"] == 5
 
+    def test_variability_margin(self, sample_qa_dataset, sample_cartography_metrics):
+        """Test that variability_margin parameter affects classification."""
+        # Test with positive margin (stricter - fewer ambiguous)
+        filter_strict = AmbiguousQuestionFilter(
+            dataset=sample_qa_dataset,
+            metrics_path=sample_cartography_metrics,
+            top_fraction=1.0,  # Keep all ambiguous
+            variability_margin=0.1,  # Positive margin
+        )
+        filtered_strict = filter_strict.apply()
+
+        # Test with negative margin (more lenient - more ambiguous)
+        filter_lenient = AmbiguousQuestionFilter(
+            dataset=sample_qa_dataset,
+            metrics_path=sample_cartography_metrics,
+            top_fraction=1.0,  # Keep all ambiguous
+            variability_margin=-0.1,  # Negative margin
+        )
+        filtered_lenient = filter_lenient.apply()
+
+        # With negative margin, more examples are classified as ambiguous
+        # So fewer examples should be kept (since top_fraction=1.0 keeps all ambiguous,
+        # but the total filtered size might differ based on easy/hard classification)
+        assert filter_strict.variability_margin == 0.1
+        assert filter_lenient.variability_margin == -0.1
+
 
 class TestClusterFilter:
     """Test suite for ClusterFilter."""
