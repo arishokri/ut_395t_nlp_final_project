@@ -234,6 +234,7 @@ cartography_output*/
 experiments/
 notebooks/*.json
 extra_guides/
+ablation_results/
 
 # wandb
 wandb/

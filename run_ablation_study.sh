@@ -27,9 +27,9 @@ ask_yes_no() {
     local default="${2:-n}"
     
     if [ "$default" = "y" ]; then
-        read -p "$prompt (Y/n) " -n 1 -r
+        read -p "$prompt (Y/n) " -n 1 -r < /dev/tty
     else
-        read -p "$prompt (y/N) " -n 1 -r
+        read -p "$prompt (y/N) " -n 1 -r < /dev/tty
     fi
     echo
     
@@ -48,7 +48,7 @@ ask_number() {
     local max="$4"
     
     while true; do
-        read -p "$prompt [default: $default]: " input
+        read -p "$prompt [default: $default]: " input < /dev/tty
         
         # Use default if empty
         if [ -z "$input" ]; then
