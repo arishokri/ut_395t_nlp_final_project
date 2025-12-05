@@ -28,6 +28,66 @@ python analyze_sweep_results.py --compare_with_baseline
 
 ---
 
+## Ablation Study
+
+Compare model performance when using full inputs vs. question-only vs. passage-only:
+
+```bash
+# Run interactive ablation study
+./run_ablation_study.sh
+```
+
+The script will interactively prompt you for:
+
+- Number of random seeds (1-5, default: 3)
+- Batch size (default: 64)
+- Training/evaluation sample limits (default: 5000/1000, or 0 for full dataset)
+- Whether to reuse existing fine-tuned model (only available for full dataset runs)
+
+**Ablation Types:**
+
+- `none` - Full model with question + passage (baseline)
+- `q_only` - Question-only (passage tokens masked out)
+- `p_only` - Passage-only (question replaced with generic prompt)
+
+**Model Reuse Behavior:**
+
+- **Full dataset** (sample limits = 0): Baseline can optionally load fine-tuned model from `./trained_models/` for eval-only (saves time)
+- **Limited samples**: All models train from scratch
+- **Ablated models** (q_only, p_only): Always train from scratch for fair comparison
+
+**Outputs:** (saved to `./ablation_results/`)
+
+- Statistical comparison with t-tests and effect sizes (Cohen's d)
+- 95% confidence intervals for all metrics
+- Comparison visualizations (bar charts, delta plots, scatter plots)
+- Summary CSV and detailed JSON results
+
+**Example Output:**
+
+```
+COMPARISON WITH BASELINE (none)
+========================================================================
+
+Q_ONLY vs NONE:
+  F1:
+    Baseline:      0.7542
+    q_only:        0.6123
+    Delta:         -0.1419 (-18.81%)
+    Significance:  p=0.0023 **
+    Effect size:   d=-1.234 (large)
+```
+
+To analyze existing results without retraining:
+
+```bash
+python analyze_ablations.py --experiment_dir ./experiments --output_dir ./ablation_results
+```
+
+For detailed usage instructions, see [ABLATION_STUDY_GUIDE.md](ABLATION_STUDY_GUIDE.md).
+
+---
+
 ## Training and evaluating a model
 
 ### General
