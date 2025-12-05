@@ -19,6 +19,9 @@ pytest tests/test_dataset_filters.py -v
 # Test helpers
 pytest tests/test_helpers.py -v
 
+# Test boolean arguments (CLI and W&B sweep compatibility)
+pytest tests/test_boolean_arguments.py -v
+
 # Test cartography
 pytest tests/test_cartography.py -v
 
@@ -41,6 +44,12 @@ pytest tests/test_dataset_filters.py::TestAmbiguousQuestionFilter -v
 # Test cluster filtering
 pytest tests/test_dataset_filters.py::TestClusterFilter -v
 
+# Test boolean argument conversion
+pytest tests/test_boolean_arguments.py::TestStrToBool -v
+
+# Test boolean argument parsing (flag vs value style)
+pytest tests/test_boolean_arguments.py::TestBooleanArgumentParsing -v
+
 # Test baseline scenarios
 pytest tests/test_run_integration.py::TestRunBaseline -v
 
@@ -53,6 +62,12 @@ pytest tests/test_run_integration.py::TestRunCombinedStrategies -v
 ```bash
 # Test a specific filtering scenario
 pytest tests/test_dataset_filters.py::TestAmbiguousQuestionFilter::test_filter_removes_ambiguous_examples -v
+
+# Test flag-style boolean arguments
+pytest tests/test_boolean_arguments.py::TestBooleanArgumentParsing::test_flag_style_single_flag -v
+
+# Test W&B sweep-style boolean arguments
+pytest tests/test_boolean_arguments.py::TestBooleanArgumentParsing::test_wandb_sweep_style_true -v
 
 # Test cartography loading
 pytest tests/test_cartography.py::TestLoadCartographyMetrics::test_load_from_directory -v

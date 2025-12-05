@@ -24,6 +24,24 @@ from helpers import (
 NUM_PREPROCESSING_WORKERS = 2
 
 
+def str_to_bool(v):
+    """
+    Convert string to boolean for argparse.
+    Handles both flag-style (--flag) and value-style (--flag=true) arguments.
+    This makes the script work with both command-line usage and W&B sweeps.
+    """
+    if isinstance(v, bool):
+        return v
+    if v is None:
+        return False
+    if v.lower() in ("yes", "true", "t", "y", "1"):
+        return True
+    elif v.lower() in ("no", "false", "f", "n", "0"):
+        return False
+    else:
+        raise ValueError(f"Boolean value expected, got: {v}")
+
+
 def main():
     argp = HfArgumentParser(TrainingArguments)
     # The HfArgumentParser object collects command-line arguments into an object (and provides default values for unspecified arguments).
@@ -84,7 +102,9 @@ def main():
     )
     argp.add_argument(
         "--enable_cartography",
-        type=lambda x: x.lower() == "true" if isinstance(x, str) else bool(x),
+        type=str_to_bool,
+        nargs="?",
+        const=True,
         default=False,
         help="Enable dataset cartography tracking during training to identify easy/hard/ambiguous examples.",
     )
@@ -96,7 +116,9 @@ def main():
     )
     argp.add_argument(
         "--filter_ambiguous",
-        type=lambda x: x.lower() == "true" if isinstance(x, str) else bool(x),
+        type=str_to_bool,
+        nargs="?",
+        const=True,
         default=False,
         help="Filter dataset to remove most ambiguous examples (keeps easy + hard + top fraction of ambiguous based on cartography metrics).",
     )
@@ -114,7 +136,9 @@ def main():
     )
     argp.add_argument(
         "--filter_clusters",
-        type=lambda x: x.lower() == "true" if isinstance(x, str) else bool(x),
+        type=str_to_bool,
+        nargs="?",
+        const=True,
         default=False,
         help="Filter dataset based on cluster assignments.",
     )
@@ -126,7 +150,9 @@ def main():
     )
     argp.add_argument(
         "--exclude_noise_cluster",
-        type=lambda x: x.lower() == "true" if isinstance(x, str) else bool(x),
+        type=str_to_bool,
+        nargs="?",
+        const=True,
         default=False,
         help="Exclude noise cluster (-1) from training and validation sets when using cluster filtering.",
     )
@@ -138,7 +164,9 @@ def main():
     )
     argp.add_argument(
         "--use_label_smoothing",
-        type=lambda x: x.lower() == "true" if isinstance(x, str) else bool(x),
+        type=str_to_bool,
+        nargs="?",
+        const=True,
         default=False,
         help="Enable variability-based label smoothing to reduce overfitting on ambiguous/noisy examples.",
     )
@@ -150,7 +178,9 @@ def main():
     )
     argp.add_argument(
         "--use_soft_weighting",
-        type=lambda x: x.lower() == "true" if isinstance(x, str) else bool(x),
+        type=str_to_bool,
+        nargs="?",
+        const=True,
         default=False,
         help="Enable soft weight schedule using variability from cartography metrics.",
     )
@@ -174,7 +204,9 @@ def main():
     )
     argp.add_argument(
         "--filter_validation",
-        type=lambda x: x.lower() == "true" if isinstance(x, str) else bool(x),
+        type=str_to_bool,
+        nargs="?",
+        const=True,
         default=False,
         help="Apply filtering to validation set. Works with --filter_ambiguous, --filter_rule_based, and --filter_clusters.",
     )
@@ -210,7 +242,9 @@ def main():
     )
     argp.add_argument(
         "--filter_rule_based",
-        type=lambda x: x.lower() == "true" if isinstance(x, str) else bool(x),
+        type=str_to_bool,
+        nargs="?",
+        const=True,
         default=False,
         help="Filter dataset based on rule-based error detection (excludes examples matching the rule).",
     )

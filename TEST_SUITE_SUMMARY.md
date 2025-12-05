@@ -47,7 +47,46 @@ This comprehensive test suite replaces the `demos/` directory with proper pytest
 - `--ablations` (none, q_only, p_only)
 - Dataset preprocessing pipeline
 
-### 4. `test_cartography.py` - Cartography Tests
+### 4. `test_boolean_arguments.py` - Boolean Argument Tests
+
+**Coverage:**
+
+- ✅ `str_to_bool()` conversion function
+  - Boolean input handling (True/False)
+  - None input handling
+  - String variants: true/false, yes/no, 1/0, t/f, y/n (case-insensitive)
+  - Invalid input error handling
+- ✅ Argparse integration
+  - Flag-style syntax: `--flag` (CLI usage)
+  - Value-style syntax: `--flag=true/false` (W&B sweeps)
+  - Mixed flag and value styles
+  - Default values (False when not provided)
+- ✅ Integration with run.py
+  - All 8 boolean arguments present in help text
+  - Flag-style parsing
+  - Value-style parsing (W&B sweep format)
+
+**Entry Points Tested:**
+
+- `--enable_cartography`
+- `--filter_ambiguous`
+- `--filter_clusters`
+- `--exclude_noise_cluster`
+- `--use_label_smoothing`
+- `--use_soft_weighting`
+- `--filter_validation`
+- `--filter_rule_based`
+
+**Why This Matters:**
+
+This test ensures the dual-mode boolean argument system works correctly for both:
+
+1. **Command-line usage**: `python run.py --filter_clusters --filter_validation`
+2. **W&B sweeps**: `python run.py --filter_clusters=true --filter_validation=false`
+
+The implementation uses `nargs='?'` with `const=True` to support both patterns cleanly, without needing lambda functions or special workarounds.
+
+### 5. `test_cartography.py` - Cartography Tests
 
 **Coverage:**
 
