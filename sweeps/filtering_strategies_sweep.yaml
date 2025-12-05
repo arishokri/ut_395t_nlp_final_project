@@ -78,3 +78,7 @@ parameters:
     distribution: uniform
     min: 0.5
     max: 0.9
+
+  # Drop percentage threshold - terminate early if too much data is dropped
+  max_drop_percentage:
+    value: 30 # Fail if more than 30% of data is dropped (filtered out)

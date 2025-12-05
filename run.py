@@ -260,6 +260,12 @@ def main():
         default=0.05,
         help="Similarity threshold for low_answer_question_overlap (default: 0.05).",
     )
+    argp.add_argument(
+        "--max_drop_percentage",
+        type=float,
+        default=None,
+        help="Maximum percentage of data that can be dropped (filtered out) for both training and evaluation (0-100). If exceeded, training terminates early. Default: None (no limit).",
+    )
 
     training_args, args = argp.parse_args_into_dataclasses()
 
@@ -558,11 +564,30 @@ def main():
                     "train/original_size": train_original_size,
                     "train/final_size": train_final_size,
                     "train/total_removed": train_total_removed,
-                    "train/total_removal_percentage": train_total_removed
+                    "train/drop_percentage": train_total_removed
                     / train_original_size
                     * 100,
                 }
             )
+
+        # Check if drop percentage exceeds threshold
+        if args.max_drop_percentage is not None and train_total_removed > 0:
+            train_drop_pct = train_total_removed / train_original_size * 100
+            if train_drop_pct > args.max_drop_percentage:
+                error_msg = f"Drop percentage threshold exceeded for training: {train_drop_pct:.1f}% > {args.max_drop_percentage}%. Terminating early."
+                print(f"\n{'=' * 70}")
+                print(f"ERROR: {error_msg}")
+                print(f"{'=' * 70}\n")
+                # Log to W&B before terminating
+                if wandb_enabled:
+                    wandb.log(
+                        {
+                            "drop_threshold_exceeded": True,
+                            "drop_percentage": train_drop_pct,
+                        }
+                    )
+                    wandb.finish(exit_code=1)
+                raise ValueError(error_msg)
 
         train_dataset_featurized = train_dataset.map(
             prepare_train_dataset,
@@ -698,11 +723,30 @@ def main():
                         "eval/original_size": eval_original_size,
                         "eval/final_size": eval_final_size,
                         "eval/total_removed": eval_total_removed,
-                        "eval/total_removal_percentage": eval_total_removed
+                        "eval/drop_percentage": eval_total_removed
                         / eval_original_size
                         * 100,
                     }
                 )
+
+            # Check if drop percentage exceeds threshold
+            if args.max_drop_percentage is not None and eval_total_removed > 0:
+                eval_drop_pct = eval_total_removed / eval_original_size * 100
+                if eval_drop_pct > args.max_drop_percentage:
+                    error_msg = f"Drop percentage threshold exceeded for evaluation: {eval_drop_pct:.1f}% > {args.max_drop_percentage}%. Terminating early."
+                    print(f"\n{'=' * 70}")
+                    print(f"ERROR: {error_msg}")
+                    print(f"{'=' * 70}\n")
+                    # Log to W&B before terminating
+                    if wandb_enabled:
+                        wandb.log(
+                            {
+                                "drop_threshold_exceeded": True,
+                                "drop_percentage": eval_drop_pct,
+                            }
+                        )
+                        wandb.finish(exit_code=1)
+                    raise ValueError(error_msg)
 
         eval_dataset_featurized = eval_dataset.map(
             prepare_eval_dataset,

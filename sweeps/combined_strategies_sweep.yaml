@@ -99,6 +99,10 @@ parameters:
     min: 5
     max: 15
 
+  # Drop percentage threshold - terminate early if too much data is dropped
+  max_drop_percentage:
+    value: 30 # Fail if more than 30% of data is dropped (filtered out)
+
 # Early termination for poorly performing runs
 early_terminate:
   type: hyperband

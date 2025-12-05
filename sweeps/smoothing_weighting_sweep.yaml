@@ -73,3 +73,7 @@ parameters:
     distribution: uniform
     min: 5
     max: 15
+
+  # Drop percentage threshold (not relevant for this sweep but keeping for consistency)
+  max_drop_percentage:
+    value: 30

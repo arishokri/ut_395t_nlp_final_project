@@ -56,3 +56,7 @@ parameters:
   # Multiple seeds for statistical significance
   seed:
     values: [42, 123, 456, 789, 2024]
+
+  # Drop percentage threshold (not relevant for baseline but keeping for consistency)
+  max_drop_percentage:
+    value: 30
