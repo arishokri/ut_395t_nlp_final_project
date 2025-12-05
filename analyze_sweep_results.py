@@ -58,9 +58,14 @@ def extract_run_metrics(run: wandb.apis.public.Run) -> Dict:
         "seed": config.get("seed", "N/A"),
         # Filtering strategies
         "filter_ambiguous": config.get("filter_ambiguous", False),
+        "ambiguous_top_fraction": config.get("ambiguous_top_fraction", "N/A"),
+        "variability_margin": config.get("variability_margin", "N/A"),
         "filter_clusters": config.get("filter_clusters", False),
         "exclude_noise_cluster": config.get("exclude_noise_cluster", False),
         "min_cluster_probability": config.get("min_cluster_probability", "N/A"),
+        "filter_rule_based": config.get("filter_rule_based", False),
+        "rule_name": config.get("rule_name", "N/A"),
+        "rule_sim_threshold": config.get("rule_sim_threshold", "N/A"),
         "filter_validation": config.get("filter_validation", False),
         # Training modifications
         "use_label_smoothing": config.get("use_label_smoothing", False),
@@ -132,10 +137,12 @@ def print_summary_statistics(df: pd.DataFrame):
     strategies = {
         "Baseline": (~df["filter_ambiguous"])
         & (~df["filter_clusters"])
+        & (~df["filter_rule_based"])
         & (~df["use_label_smoothing"])
         & (~df["use_soft_weighting"]),
         "Ambiguous Filtering": df["filter_ambiguous"],
         "Cluster Filtering": df["filter_clusters"],
+        "Rule-Based Filtering": df["filter_rule_based"],
         "Label Smoothing": df["use_label_smoothing"],
         "Soft Weighting": df["use_soft_weighting"],
     }
@@ -168,6 +175,7 @@ def compare_with_baseline(df: pd.DataFrame):
     baseline_mask = (
         (~df["filter_ambiguous"])
         & (~df["filter_clusters"])
+        & (~df["filter_rule_based"])
         & (~df["use_label_smoothing"])
         & (~df["use_soft_weighting"])
     )
@@ -199,6 +207,7 @@ def compare_with_baseline(df: pd.DataFrame):
         [
             "filter_ambiguous",
             "filter_clusters",
+            "filter_rule_based",
             "use_label_smoothing",
             "use_soft_weighting",
         ]
@@ -218,8 +227,10 @@ def compare_with_baseline(df: pd.DataFrame):
             if name[1]:
                 strategy_desc.append("ClustFilt")
             if name[2]:
-                strategy_desc.append("Smooth")
+                strategy_desc.append("RuleFilt")
             if name[3]:
+                strategy_desc.append("Smooth")
+            if name[4]:
                 strategy_desc.append("Weight")
 
             strategy_str = "+".join(strategy_desc) if strategy_desc else "Baseline"
@@ -315,6 +326,7 @@ def main():
             "eval_f1",
             "filter_ambiguous",
             "filter_clusters",
+            "filter_rule_based",
             "use_label_smoothing",
             "use_soft_weighting",
         ]
