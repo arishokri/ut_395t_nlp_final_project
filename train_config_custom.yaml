@@ -1,0 +1,55 @@
+# Custom Training Configuration File
+# Edit these parameters to customize your training run
+# Dataset sizes (max_train_samples, max_eval_samples) will be asked interactively
+
+# Model and Dataset
+model: "google/electra-small-discriminator"
+dataset: "Eladio/emrqa-msquad"
+max_length: 512
+
+# Training Parameters
+num_train_epochs: 3
+per_device_train_batch_size: 64
+learning_rate: 3e-5
+seed: 42
+
+# Cartography
+enable_cartography: false
+cartography_output_dir: "./cartography_output"
+
+# Filtering Strategies
+filter_ambiguous: true
+ambiguous_top_fraction: 0.33
+variability_margin: 0.0
+
+filter_clusters: true
+cluster_assignments_path: "./cluster_output"
+validation_cluster_assignments_path: "./cluster_output_validation"
+exclude_noise_cluster: true
+min_cluster_probability: null # Set to 0.0-1.0 to enable, or null to disable
+
+filter_rule_based: true
+rule_name: "low_answer_question_overlap"
+rule_sim_threshold: 0.05
+
+filter_validation: true
+
+# Training Modifications
+use_label_smoothing: true
+smoothing_factor: 0.6
+
+use_soft_weighting: true
+weight_clip_min: 0.1
+weight_clip_max: 10.0
+
+# W&B Settings
+wandb_project: "qa-training-runs"
+wandb_tags: "" # Comma-separated tags (e.g., "baseline,filtered")
+
+# Advanced Training Arguments
+eval_strategy: "epoch"
+save_strategy: "epoch"
+save_total_limit: 2
+logging_steps: 100
+load_best_model_at_end: true
+metric_for_best_model: "f1"
