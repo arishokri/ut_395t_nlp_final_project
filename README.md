@@ -3,7 +3,7 @@
 This repository includes a comprehensive hyperparameter search system using **Weights & Biases** for exploring different training strategies:
 
 - **Baseline runs** with multiple seeds
-- **Data filtering** (cartography-based, cluster-based)
+- **Data filtering** (cartography-based, cluster-based, rule-based)
 - **Label smoothing** with variability-based factors
 - **Soft weighting** for example importance
 - **Combined strategies** for synergistic effects
@@ -21,9 +21,11 @@ wandb login
 # 3. Run sweeps
 python sweep_launcher.py --sweep baseline --count 5
 python sweep_launcher.py --sweep filtering --count 20
+python sweep_launcher.py --sweep smoothing --count 30
+python sweep_launcher.py --sweep combined --count 50
 
 # 4. Analyze results
-python analyze_sweep_results.py --compare_with_baseline
+python analyze_sweep_results.py --compare_with_baseline --export results.csv
 ```
 
 ---
@@ -512,9 +514,25 @@ python run.py \
 - `--exclude_noise_cluster`: Exclude noise cluster (-1) from training/validation
 - `--min_cluster_probability`: Minimum membership probability threshold
 
+### Rule-Based Filtering
+
+Filter examples using rule-based error detection patterns:
+
+```bash
+python run.py \
+  --do_train \
+  --filter_rule_based \
+  --rule_name low_answer_question_overlap \
+  --rule_sim_threshold 0.05
+```
+
+- `--filter_rule_based`: Enable rule-based filtering
+- `--rule_name`: Name of the rule to apply (default: 'low_answer_question_overlap')
+- `--rule_sim_threshold`: Similarity threshold for the rule (default: 0.05)
+
 ### Combined Filtering
 
-Apply both ambiguous and cluster filtering:
+Apply multiple filtering strategies together:
 
 ```bash
 python run.py \
@@ -523,9 +541,12 @@ python run.py \
   --ambiguous_top_fraction 0.5 \
   --variability_margin 0.05 \
   --filter_clusters \
+  --exclude_noise_cluster \
+  --min_cluster_probability 0.7 \
+  --filter_rule_based \
+  --rule_name low_answer_question_overlap \
   --cartography_output_dir ./cartography_output \
   --cluster_assignments_path ./cluster_output \
-  --exclude_noise_cluster \
   --filter_validation \
   --output_dir ./clean_model
 ```
