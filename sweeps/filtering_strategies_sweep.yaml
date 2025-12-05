@@ -64,22 +64,22 @@ parameters:
   enable_cartography:
     value: false
 
-  # Apply filtering to validation set (only applies when filter_cartography=true)
+  # Apply filtering to validation set (only applies when filter_ambiguous=true)
   # Note: Validation is NOT filtered in cluster filtering mode to avoid cluster mismatch
   filter_validation:
     value: true
 
   # Grid search over filtering strategies
-  filter_cartography:
+  filter_ambiguous:
     values: [false, true]
 
-  # Top fraction for cartography filtering (only relevant when filter_cartography=true)
-  cartography_top_fraction:
+  # Top fraction for ambiguous filtering (only relevant when filter_ambiguous=true)
+  ambiguous_top_fraction:
     distribution: uniform
     min: 0.25
     max: 0.70
 
-  # Variability margin for ambiguous classification (only relevant when filter_cartography=true)
+  # Variability margin for ambiguous classification (only relevant when filter_ambiguous=true)
   variability_margin:
     distribution: uniform
     min: -0.05

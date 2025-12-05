@@ -64,16 +64,16 @@ parameters:
   enable_cartography:
     value: false
 
-  # Apply filtering to validation set (only applies when filter_cartography=true)
+  # Apply filtering to validation set (only applies when filter_ambiguous=true)
   # Note: Validation is NOT filtered in cluster filtering mode to avoid cluster mismatch
   filter_validation:
     value: true
 
   # Combined strategies search space
-  filter_cartography:
+  filter_ambiguous:
     values: [true, false]
 
-  cartography_top_fraction:
+  ambiguous_top_fraction:
     values: [0.25, 0.33, 0.55, 0.7]
 
   variability_margin:

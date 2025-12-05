@@ -57,7 +57,7 @@ def extract_run_metrics(run: wandb.apis.public.Run) -> Dict:
         "learning_rate": config.get("learning_rate", "N/A"),
         "seed": config.get("seed", "N/A"),
         # Filtering strategies
-        "filter_cartography": config.get("filter_cartography", False),
+        "filter_ambiguous": config.get("filter_ambiguous", False),
         "filter_clusters": config.get("filter_clusters", False),
         "exclude_noise_cluster": config.get("exclude_noise_cluster", False),
         "min_cluster_probability": config.get("min_cluster_probability", "N/A"),
@@ -130,11 +130,11 @@ def print_summary_statistics(df: pd.DataFrame):
 
     # Group by strategy type
     strategies = {
-        "Baseline": (~df["filter_cartography"])
+        "Baseline": (~df["filter_ambiguous"])
         & (~df["filter_clusters"])
         & (~df["use_label_smoothing"])
         & (~df["use_soft_weighting"]),
-        "Cartography Filtering": df["filter_cartography"],
+        "Ambiguous Filtering": df["filter_ambiguous"],
         "Cluster Filtering": df["filter_clusters"],
         "Label Smoothing": df["use_label_smoothing"],
         "Soft Weighting": df["use_soft_weighting"],
@@ -166,7 +166,7 @@ def print_summary_statistics(df: pd.DataFrame):
 def compare_with_baseline(df: pd.DataFrame):
     """Compare all strategies against baseline."""
     baseline_mask = (
-        (~df["filter_cartography"])
+        (~df["filter_ambiguous"])
         & (~df["filter_clusters"])
         & (~df["use_label_smoothing"])
         & (~df["use_soft_weighting"])
@@ -197,7 +197,7 @@ def compare_with_baseline(df: pd.DataFrame):
     # Group by combinations of strategies
     grouped = df.groupby(
         [
-            "filter_cartography",
+            "filter_ambiguous",
             "filter_clusters",
             "use_label_smoothing",
             "use_soft_weighting",
@@ -214,7 +214,7 @@ def compare_with_baseline(df: pd.DataFrame):
 
             strategy_desc = []
             if name[0]:
-                strategy_desc.append("CartFilt")
+                strategy_desc.append("AmbigFilt")
             if name[1]:
                 strategy_desc.append("ClustFilt")
             if name[2]:
@@ -313,7 +313,7 @@ def main():
         [
             "run_name",
             "eval_f1",
-            "filter_cartography",
+            "filter_ambiguous",
             "filter_clusters",
             "use_label_smoothing",
             "use_soft_weighting",

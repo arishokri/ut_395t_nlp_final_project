@@ -93,18 +93,16 @@ def main():
         default="./cartography_output",
         help="Directory for cartography outputs. Used for: saving training dynamics (--enable_cartography), filtering (--filter_cartography), label smoothing (--use_label_smoothing), and soft weighting (--use_soft_weighting).",
     )
-    #! Rename cartography to ambiguous
     argp.add_argument(
-        "--filter_cartography",
+        "--filter_ambiguous",
         action="store_true",
-        help="Filter dataset based on cartography metrics (removes ambiguous examples).",
+        help="Filter dataset to remove most ambiguous examples (keeps easy + hard + top fraction of ambiguous based on cartography metrics).",
     )
-    #! Rename cartography to ambiguous
     argp.add_argument(
-        "--cartography_top_fraction",
+        "--ambiguous_top_fraction",
         type=float,
         default=0.33,
-        help="Fraction of most ambiguous examples to keep when using cartography filtering (default: 0.33 = top 33%%).",
+        help="Fraction of most ambiguous examples to keep when using ambiguous filtering (default: 0.33 = top 33%%).",
     )
     argp.add_argument(
         "--variability_margin",
@@ -171,7 +169,7 @@ def main():
     argp.add_argument(
         "--filter_validation",
         action="store_true",
-        help="Apply filtering to validation set. Works with --filter_cartography, --filter_rule_based, and --filter_clusters.",
+        help="Apply filtering to validation set. Works with --filter_ambiguous, --filter_rule_based, and --filter_clusters.",
     )
     argp.add_argument(
         "--validation_cartography_output_dir",
@@ -239,8 +237,8 @@ def main():
         if run_name is None:
             # Create descriptive name based on configuration
             name_parts = []
-            if args.filter_cartography:
-                name_parts.append("cart_filt")
+            if args.filter_ambiguous:
+                name_parts.append("ambig_filt")
             if args.filter_clusters:
                 noise_suffix = "_excl_noise" if args.exclude_noise_cluster else ""
                 name_parts.append(f"clust_filt{noise_suffix}")
@@ -270,8 +268,8 @@ def main():
                 "learning_rate": training_args.learning_rate,
                 "seed": training_args.seed,
                 # Filtering strategies
-                "filter_cartography": args.filter_cartography,
-                "cartography_top_fraction": args.cartography_top_fraction,
+                "filter_ambiguous": args.filter_ambiguous,
+                "ambiguous_top_fraction": args.ambiguous_top_fraction,
                 "variability_margin": args.variability_margin,
                 "filter_clusters": args.filter_clusters,
                 "filter_rule_based": args.filter_rule_based,
@@ -355,22 +353,21 @@ def main():
         if args.max_train_samples:
             train_dataset = train_dataset.select(range(args.max_train_samples))
 
-        # Apply cartography filtering if requested
-        if args.filter_cartography:
+        # Apply ambiguous filtering if requested
+        if args.filter_ambiguous:
             print(f"\n{'=' * 70}")
-            print("APPLYING CARTOGRAPHY FILTERING")
+            print("APPLYING AMBIGUOUS FILTERING")
             print(f"{'=' * 70}")
             print(f"Using cartography metrics from: {args.cartography_output_dir}")
 
             original_size = len(train_dataset)
 
             # Create filter configuration
-            #! Currently we're not using any of the rule-based.
             filter_config = {
                 "ambiguous": {
                     "enabled": True,
                     "metrics_path": args.cartography_output_dir,
-                    "top_fraction": args.cartography_top_fraction,
+                    "top_fraction": args.ambiguous_top_fraction,
                     "variability_margin": args.variability_margin,
                     "apply_rule_based_filter": False,
                 }
@@ -522,7 +519,7 @@ def main():
         # Apply filtering to validation set if requested
         # Note: filter_validation works with all filtering strategies
         if args.filter_validation and (
-            args.filter_cartography or args.filter_rule_based or args.filter_clusters
+            args.filter_ambiguous or args.filter_rule_based or args.filter_clusters
         ):
             print(f"\n{'=' * 70}")
             print("APPLYING FILTERS TO VALIDATION SET")
@@ -540,17 +537,17 @@ def main():
             # Build filter config for validation
             val_filter_config = {}
 
-            # Add cartography filtering if enabled
-            if args.filter_cartography:
+            # Add ambiguous filtering if enabled
+            if args.filter_ambiguous:
                 val_filter_config["ambiguous"] = {
                     "enabled": True,
                     "metrics_path": val_cartography_dir,
-                    "top_fraction": args.cartography_top_fraction,
+                    "top_fraction": args.ambiguous_top_fraction,
                     "variability_margin": args.variability_margin,
                     "apply_rule_based_filter": False,
                 }
                 print(f"  Cartography metrics from: {val_cartography_dir}")
-                print(f"  Top fraction: {args.cartography_top_fraction}")
+                print(f"  Top fraction: {args.ambiguous_top_fraction}")
                 print(f"  Variability margin: {args.variability_margin}")
 
             # Add rule-based filtering if enabled

@@ -367,7 +367,7 @@ python run.py \
 # 3. Train with both sets filtered
 python run.py \
   --do_train --do_eval \
-  --filter_cartography \
+  --filter_ambiguous \
   --cartography_output_dir ./cartography_output \
   --filter_validation \
   --validation_cartography_output_dir ./cartography_output_validation \
@@ -474,18 +474,18 @@ Then train with filtered data:
 python run.py \
   --do_train \
   --num_train_epochs 3 \
-  --filter_cartography \
+  --filter_ambiguous \
   --cartography_output_dir ./cartography_output \
-  --cartography_top_fraction 0.33 \
+  --ambiguous_top_fraction 0.33 \
   --variability_margin 0.0 \
   --output_dir ./filtered_model
 ```
 
-**Cartography Filtering Parameters:**
+**Ambiguous Filtering Parameters:**
 
-- `--filter_cartography`: Enable cartography-based filtering
+- `--filter_ambiguous`: Enable ambiguous example filtering (keeps easy + hard + top fraction of ambiguous)
 - `--cartography_output_dir`: Path to cartography metrics directory
-- `--cartography_top_fraction`: Fraction of most ambiguous examples to keep (default: 0.33)
+- `--ambiguous_top_fraction`: Fraction of most ambiguous examples to keep (default: 0.33)
   - 0.33 = keep top 33% of ambiguous examples
   - Lower values = more aggressive filtering (fewer ambiguous kept)
   - Higher values = more lenient filtering (more ambiguous kept)
@@ -514,13 +514,13 @@ python run.py \
 
 ### Combined Filtering
 
-Apply both cartography and cluster filtering:
+Apply both ambiguous and cluster filtering:
 
 ```bash
 python run.py \
   --do_train \
-  --filter_cartography \
-  --cartography_top_fraction 0.5 \
+  --filter_ambiguous \
+  --ambiguous_top_fraction 0.5 \
   --variability_margin 0.05 \
   --filter_clusters \
   --cartography_output_dir ./cartography_output \
