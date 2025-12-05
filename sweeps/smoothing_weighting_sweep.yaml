@@ -5,7 +5,7 @@
 program: run.py
 method: bayes # Intelligent search that learns from results
 project: qa-cartography-experiments
-name: smooth${use_label_smoothing}-weight${use_soft_weighting}
+name: smoothing-weighting
 
 # Metric to optimize
 # Using F1 instead of exact_match because:

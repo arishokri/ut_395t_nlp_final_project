@@ -5,7 +5,7 @@
 program: run.py
 method: bayes # Bayesian optimization for efficiency
 project: qa-cartography-experiments
-name: combined-ambig${filter_ambiguous}-smooth${use_label_smoothing}
+name: combined-strategies
 
 # Metric to optimize
 # Using F1 instead of exact_match because:

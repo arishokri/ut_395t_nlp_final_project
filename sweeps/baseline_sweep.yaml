@@ -4,7 +4,7 @@
 program: run.py
 method: grid
 project: qa-cartography-experiments
-name: baseline-seed-${seed}
+name: baseline-seeds
 
 # Metric to optimize
 # Using F1 instead of exact_match because:

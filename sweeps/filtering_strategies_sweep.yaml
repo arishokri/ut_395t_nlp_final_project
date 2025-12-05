@@ -5,7 +5,7 @@
 program: run.py
 method: bayes # Intelligent search that learns from results
 project: qa-cartography-experiments
-name: filtering-ambig${filter_ambiguous}-clust${filter_clusters}
+name: filtering-strategies
 
 # Metric to optimize
 # Using F1 instead of exact_match because:

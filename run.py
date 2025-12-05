@@ -275,10 +275,10 @@ def main():
                 noise_suffix = "_excl_noise" if args.exclude_noise_cluster else ""
                 name_parts.append(f"clust_filt{noise_suffix}")
             if args.use_label_smoothing:
-                name_parts.append(f"smooth{args.smoothing_factor}")
+                name_parts.append(f"smooth{args.smoothing_factor:.3f}")
             if args.use_soft_weighting:
                 name_parts.append(
-                    f"weight_{args.weight_clip_min}-{args.weight_clip_max}"
+                    f"weight_{args.weight_clip_min:.3f}-{args.weight_clip_max:.3f}"
                 )
 
             run_name = "_".join(name_parts) if name_parts else "baseline"
