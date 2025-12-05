@@ -225,12 +225,14 @@ trainer_output/
 _kmeans/
 _dbscan/
 embeddings_output/
-cartography_output/
+embeddings_output_validation/
 cluster_output/
+cluster_output_validation/
 eval_baseline_emrqa/
 trained_models/
 full_analysis_output/
 cartography_analysis/
+cartography_output/
 cartography_output_full/
 cartography_output_validation/
 experiments/
@@ -239,4 +241,9 @@ experiments/
 cartography_output_other/
 **OLD**
 notebooks/*.json
+<<<<<<< Updated upstream
 extra_guides/
+=======
+extra_guides/
+error_analysis.tex
+>>>>>>> Stashed changes

@@ -19,19 +19,33 @@ Before running experiments, you need to have:
 
 - Cartography metrics from a previous training run (for filtering/smoothing/weighting strategies)
 - Optionally: Cluster assignments (for cluster-based filtering)
-- Optionally: If you're using filtering strategy you need to run cartography on validation split as well.
+- **Important**: If you're using filtering strategies (`--filter_validation`), you need to generate cartography metrics for the validation set separately
 - Make sure you keep track of where you are saving the results of all the above otherwise they might be overwritten.
+
+**Note on Validation Filtering**: When using filtering strategies, you should filter both training and validation sets using their respective cartography metrics. This ensures fair evaluation on data with similar characteristics.
 
 Generate cartography metrics:
 
 ```bash
+# For training set
 python run.py \
-    --do_train --do_eval \
+    --do_train \
     --enable_cartography \
+    --train_split train \
     --cartography_output_dir ./cartography_output \
     --max_train_samples 10000 \
     --num_train_epochs 5 \
-    --output_dir ./initial_training
+    --output_dir ./cartography_train
+
+# For validation set (if using --filter_validation)
+python run.py \
+    --do_train \
+    --enable_cartography \
+    --train_split validation \
+    --cartography_output_dir ./cartography_output_validation \
+    --max_train_samples 2000 \
+    --num_train_epochs 5 \
+    --output_dir ./cartography_val
 ```
 
 ### 2. Run Experiments
@@ -380,15 +394,25 @@ training = TrainingConfig(
 ### Workflow 1: Testing Different Filtering Strategies
 
 ```bash
-# 1. Generate cartography metrics
-python run.py --do_train --do_eval --enable_cartography \
-    --max_train_samples 10000 --num_train_epochs 3
+# 1. Generate cartography metrics for training set
+python run.py --do_train --enable_cartography \
+    --train_split train \
+    --cartography_output_dir ./cartography_output \
+    --max_train_samples 10000 --num_train_epochs 5
 
-# 2. Run experiments with different filtering
+# 2. Generate cartography metrics for validation set
+python run.py --do_train --enable_cartography \
+    --train_split validation \
+    --cartography_output_dir ./cartography_output_validation \
+    --max_train_samples 2000 --num_train_epochs 5
+
+# 3. Run experiments with different filtering (including validation filtering)
 python run_experiments.py --mode run --suite sample \
-    --max-train-samples 10000
+    --max-train-samples 10000 \
+    --cartography-dir ./cartography_output \
+    --validation-cartography-dir ./cartography_output_validation
 
-# 3. Analyze results
+# 4. Analyze results
 python run_experiments.py --mode analyze --show-plots
 ```
 
@@ -416,10 +440,3 @@ python run_experiments.py --mode run --suite minimal \
 python run_experiments.py --mode run --suite minimal \
     --max-train-samples 1000 --max-eval-samples 500
 ```
-
-## Next Steps
-
-- Customize experiment configurations for your needs
-- Add new experiment types by extending the config system
-- Integrate with your existing training pipeline
-- Export results for publication-ready figures

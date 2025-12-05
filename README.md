@@ -131,7 +131,10 @@ python run.py \
 Important Parameters:
 
 - `--enable_cartography`: Enables cartography tracking
-- `--cartography_output_dir`: Directory for all cartography operations (default: `./cartography_output`)
+- `--cartography_output_dir`: Directory for training set cartography operations (default: `./cartography_output`)
+- `--validation_cartography_output_dir`: Directory for validation set cartography metrics (default: `./cartography_output_validation`)
+- `--filter_validation`: Apply the same filtering strategies to the validation set
+- `--validation_cluster_assignments_path`: Path to cluster assignments for validation set (default: `./cluster_output_validation`)
 - `--num_train_epochs`: Should be ≥3 for meaningful statistics across epochs
 
 The callback will generate:
@@ -217,23 +220,77 @@ python run.py \
 2. Train final model with curriculum learning enabled
 
 ```bash
-# Stage 1: Generate metrics
+# Stage 1: Generate cartography metrics for training set
 python run.py \
   --do_train \
-  --num_train_epochs 5 \
   --enable_cartography \
+  --train_split train \
   --cartography_output_dir ./cartography_output \
-  --output_dir ./initial_model
+  --num_train_epochs 5 \
+  --max_train_samples 10000 \
+  --output_dir ./cartography_train
 
-# Stage 2: Train with curriculum learning
+# Stage 1b: Generate cartography metrics for validation set (optional, for filtering validation)
 python run.py \
   --do_train \
-  --num_train_epochs 3 \
+  --enable_cartography \
+  --train_split validation \
+  --cartography_output_dir ./cartography_output_validation \
+  --num_train_epochs 5 \
+  --max_train_samples 2000 \
+  --output_dir ./cartography_val
+
+# Stage 2: Train with curriculum learning (and optionally filter validation)
+python run.py \
+  --do_train --do_eval \
   --use_label_smoothing \
   --use_soft_weighting \
   --cartography_output_dir ./cartography_output \
+  --filter_validation \
+  --validation_cartography_output_dir ./cartography_output_validation \
+  --num_train_epochs 3 \
   --output_dir ./final_model
 ```
+
+### Filtering Validation Sets
+
+When using filtering strategies (cartography or cluster-based), you can also filter the validation set to evaluate on similar data characteristics:
+
+```bash
+# 1. Generate cartography for training data
+python run.py \
+  --do_train \
+  --enable_cartography \
+  --train_split train \
+  --cartography_output_dir ./cartography_output \
+  --max_train_samples 10000 \
+  --num_train_epochs 5
+
+# 2. Generate cartography for validation data
+python run.py \
+  --do_train \
+  --enable_cartography \
+  --train_split validation \
+  --cartography_output_dir ./cartography_output_validation \
+  --max_train_samples 2000 \
+  --num_train_epochs 5
+
+# 3. Train with both sets filtered
+python run.py \
+  --do_train --do_eval \
+  --filter_cartography \
+  --cartography_output_dir ./cartography_output \
+  --filter_validation \
+  --validation_cartography_output_dir ./cartography_output_validation \
+  --max_train_samples 10000 \
+  --max_eval_samples 2000
+```
+
+**Parameters:**
+
+- `--filter_validation`: Enable validation set filtering
+- `--validation_cartography_output_dir`: Path to validation cartography metrics (default: `./cartography_output_validation`)
+- `--validation_cluster_assignments_path`: Path to validation cluster assignments (default: `./cluster_output_validation`)
 
 ## Embedding-Based Clustering
 

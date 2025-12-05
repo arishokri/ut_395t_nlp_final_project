@@ -102,6 +102,12 @@ class TrainingConfig:
     filter_validation_set: bool = (
         False  # Whether to apply same filters to validation set
     )
+    validation_cartography_output_dir: str = (
+        "./cartography_output_validation"  # Separate cartography dir for validation
+    )
+    validation_cluster_assignments_path: str = (
+        "./cluster_output_validation"  # Separate cluster path for validation
+    )
 
 
 @dataclass
@@ -307,6 +313,24 @@ class ExperimentConfig:
             args.extend(
                 ["--cartography_output_dir", self.training.cartography_output_dir]
             )
+
+        # Validation filtering
+        if self.training.filter_validation_set:
+            args.append("--filter_validation")
+            if self.training.validation_cartography_output_dir:
+                args.extend(
+                    [
+                        "--validation_cartography_output_dir",
+                        self.training.validation_cartography_output_dir,
+                    ]
+                )
+            if self.training.validation_cluster_assignments_path:
+                args.extend(
+                    [
+                        "--validation_cluster_assignments_path",
+                        self.training.validation_cluster_assignments_path,
+                    ]
+                )
 
         return args
 
