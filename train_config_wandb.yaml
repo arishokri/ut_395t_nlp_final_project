@@ -4,12 +4,12 @@ _wandb:
   value:
     cli_version: 0.23.1
     e:
-      8uy0vvu0qibopxcy0y5ma08cx4q2zeee:
+      h3s8rn9kckcuvt3c5jle6lryqd2o668h:
         args:
-          - --ambiguous_top_fraction=0.3890298292161149
+          - --ambiguous_top_fraction=0.31178966816181064
           - --dataset=Eladio/emrqa-msquad
           - --enable_cartography=False
-          - --exclude_noise_cluster=False
+          - --exclude_noise_cluster=True
           - --filter_ambiguous=False
           - --filter_clusters=True
           - --filter_rule_based=True
@@ -17,17 +17,14 @@ _wandb:
           - --max_eval_samples=2000
           - --max_length=512
           - --max_train_samples=5000
-          - --min_cluster_probability=0.760406887845126
+          - --min_cluster_probability=0.8804699230707389
           - --model=google/electra-small-discriminator
           - --num_train_epochs=3
-          - --per_device_train_batch_size=64
-          - --smoothing_factor=0.5279782269132461
-          - --use_label_smoothing=False
+          - --per_device_train_batch_size=96
+          - --rule_sim_threshold=0.06491201362776555
+          - --train_variability_margin=0.18869762278638733
+          - --use_label_smoothing=True
           - --use_soft_weighting=False
-          - --train_variability_margin=0.011290383839404408
-          - --val_variability_margin=0.011290383839404408
-          - --weight_clip_max=5.09336763402875
-          - --weight_clip_min=0.1536845100564468
         codePath: run.py
         codePathLocal: run.py
         cpu_count: 16
@@ -36,11 +33,11 @@ _wandb:
         disk:
           /:
             total: "973837025280"
-            used: "401260982272"
+            used: "402849738752"
         email: arashsh0@live.com
         executable: /home/ari/repos/ut_395t_nlp_final_project/.venv/bin/python
         git:
-          commit: c309556be62b5926a9f7b1c10c80e615d4e21871
+          commit: cc8502fc7f6458fd5570d68a9a82bddc9f2e6dad
           remote: git@github.com:arishokri/ut_395t_nlp_final_project.git
         gpu: NVIDIA GeForce RTX 3090 Ti
         gpu_count: 1
@@ -57,8 +54,8 @@ _wandb:
         program: /home/ari/repos/ut_395t_nlp_final_project/run.py
         python: CPython 3.13.3
         root: /home/ari/repos/ut_395t_nlp_final_project
-        startedAt: "2025-12-05T18:38:01.706002Z"
-        writerId: 8uy0vvu0qibopxcy0y5ma08cx4q2zeee
+        startedAt: "2025-12-06T04:02:49.601337Z"
+        writerId: h3s8rn9kckcuvt3c5jle6lryqd2o668h
     m:
       - "1": train/global_step
         "6":
@@ -127,7 +124,7 @@ adam_epsilon:
 add_cross_attention:
   value: false
 ambiguous_top_fraction:
-  value: 0.3890298292161149
+  value: 0.31178966816181064
 architectures:
   value:
     - ElectraForPreTraining
@@ -224,7 +221,7 @@ eval_strategy:
 eval_use_gather_object:
   value: false
 exclude_noise_cluster:
-  value: false
+  value: true
 exponential_decay_length_penalty:
   value: null
 filter_ambiguous:
@@ -346,7 +343,7 @@ log_level_replica:
 log_on_each_node:
   value: true
 logging_dir:
-  value: trainer_output/runs/Dec05_12-38-00_pop-os
+  value: trainer_output/runs/Dec05_22-02-48_pop-os
 logging_first_step:
   value: false
 logging_nan_inf_filter:
@@ -372,7 +369,7 @@ max_train_samples:
 metric_for_best_model:
   value: f1
 min_cluster_probability:
-  value: 0.760406887845126
+  value: 0.8804699230707389
 min_length:
   value: 0
 model:
@@ -426,7 +423,7 @@ past_index:
 per_device_eval_batch_size:
   value: 8
 per_device_train_batch_size:
-  value: 64
+  value: 96
 per_gpu_eval_batch_size:
   value: null
 per_gpu_train_batch_size:
@@ -471,7 +468,7 @@ return_dict_in_generate:
 rule_name:
   value: low_answer_question_overlap
 rule_sim_threshold:
-  value: 0.05
+  value: 0.06491201362776555
 run_name:
   value: null
 save_on_each_node:
@@ -493,7 +490,7 @@ sep_token_id:
 skip_memory_metrics:
   value: true
 smoothing_factor:
-  value: 0.5279782269132461
+  value: 0.6
 summary_activation:
   value: gelu
 summary_last_dropout:
@@ -540,6 +537,8 @@ tpu_num_cores:
   value: null
 trackio_space_id:
   value: trackio
+train_variability_margin:
+  value: 0.18869762278638733
 transformers_version:
   value: 4.57.3
 type_vocab_size:
@@ -553,7 +552,7 @@ use_cache:
 use_cpu:
   value: false
 use_label_smoothing:
-  value: false
+  value: true
 use_legacy_prediction_loop:
   value: false
 use_liger_kernel:
@@ -562,10 +561,8 @@ use_mps_device:
   value: false
 use_soft_weighting:
   value: false
-train_variability_margin:
-  value: 0.011290383839404408
 val_variability_margin:
-  value: 0.011290383839404408
+  value: 0
 vocab_size:
   value: 30522
 warmup_ratio:
@@ -573,8 +570,8 @@ warmup_ratio:
 warmup_steps:
   value: 0
 weight_clip_max:
-  value: 5.09336763402875
+  value: 10
 weight_clip_min:
-  value: 0.1536845100564468
+  value: 0.1
 weight_decay:
   value: 0

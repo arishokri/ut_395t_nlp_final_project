@@ -911,6 +911,290 @@ def compute_overlap_statistics(unified_df: pd.DataFrame, include_rules: bool = T
     return stats
 
 
+def analyze_model_predictions(
+    eval_predictions_path: str,
+    cartography_dir: str,
+    output_dir: str,
+):
+    """Analyze model evaluation results vs cartography regions."""
+
+    print("=" * 70)
+    print("MODEL PREDICTIONS VS CARTOGRAPHY ANALYSIS")
+    print("=" * 70)
+
+    # Load eval predictions
+    print(f"\n1. Loading evaluation predictions from {eval_predictions_path}...")
+    eval_predictions = []
+    with open(eval_predictions_path, "r") as f:
+        for line in f:
+            eval_predictions.append(json.loads(line.strip()))
+
+    print(f"   Loaded {len(eval_predictions)} predictions")
+
+    # Convert to DataFrame
+    eval_df = pd.DataFrame(eval_predictions)
+
+    # Determine correctness
+    print("\n2. Determining prediction correctness...")
+
+    def is_correct(row):
+        predicted = row["predicted_answer"].strip().lower()
+        answers = [ans.strip().lower() for ans in row["answers"]["text"]]
+        return predicted in answers
+
+    eval_df["is_correct"] = eval_df.apply(is_correct, axis=1)
+    correct_count = eval_df["is_correct"].sum()
+    print(
+        f"   Correct predictions: {correct_count} ({100 * correct_count / len(eval_df):.1f}%)"
+    )
+    print(
+        f"   Incorrect predictions: {len(eval_df) - correct_count} ({100 * (len(eval_df) - correct_count) / len(eval_df):.1f}%)"
+    )
+
+    # Load cartography metrics
+    print(f"\n3. Loading cartography metrics from {cartography_dir}...")
+    cartography_df = load_cartography_metrics(cartography_dir)
+    cartography_df = categorize_examples(cartography_df)
+    print(f"   Loaded cartography data for {len(cartography_df)} examples")
+
+    # Merge with predictions
+    print("\n4. Merging predictions with cartography data...")
+    merged_df = eval_df.merge(
+        cartography_df, left_on="id", right_index=True, how="inner"
+    )
+    print(f"   Successfully merged {len(merged_df)} examples")
+
+    # Create analysis DataFrame
+    analysis_df = merged_df[
+        [
+            "id",
+            "question",
+            "context",
+            "answers",
+            "predicted_answer",
+            "is_correct",
+            "category",
+            "confidence",
+            "variability",
+            "correctness",
+        ]
+    ].copy()
+
+    # Create visualizations
+    print("\n5. Creating visualizations...")
+
+    # Plot 1: Correct vs Incorrect by Category
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    # Create contingency table
+    contingency = pd.crosstab(
+        analysis_df["category"], analysis_df["is_correct"], margins=True
+    )
+
+    # Convert to percentages
+    contingency_pct = contingency.div(contingency["All"], axis=0) * 100
+
+    # Plot
+    categories = ["easy", "hard", "ambiguous"]
+    correct_pct = [contingency_pct.loc[cat, True] for cat in categories]
+    incorrect_pct = [contingency_pct.loc[cat, False] for cat in categories]
+
+    x = np.arange(len(categories))
+    width = 0.35
+
+    ax.bar(x - width / 2, correct_pct, width, label="Correct", color="green", alpha=0.7)
+    ax.bar(
+        x + width / 2, incorrect_pct, width, label="Incorrect", color="red", alpha=0.7
+    )
+
+    ax.set_xlabel("Cartography Category")
+    ax.set_ylabel("Percentage (%)")
+    ax.set_title("Prediction Accuracy by Cartography Category")
+    ax.set_xticks(x)
+    ax.set_xticklabels(categories)
+    ax.legend()
+    ax.grid(True, alpha=0.3, axis="y")
+
+    # Add value labels
+    for i, (c, ic) in enumerate(zip(correct_pct, incorrect_pct)):
+        ax.text(i - width / 2, c + 1, f"{c:.1f}%", ha="center", va="bottom", fontsize=9)
+        ax.text(
+            i + width / 2, ic + 1, f"{ic:.1f}%", ha="center", va="bottom", fontsize=9
+        )
+
+    plt.tight_layout()
+    fig_path = os.path.join(output_dir, "prediction_accuracy_by_category.png")
+    plt.savefig(fig_path, dpi=300, bbox_inches="tight")
+    print(f"   - Saved prediction accuracy by category to {fig_path}")
+    plt.close()
+
+    # Plot 2: Stacked bar chart showing raw counts
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    # Raw counts
+    correct_counts = [contingency.loc[cat, True] for cat in categories]
+    incorrect_counts = [contingency.loc[cat, False] for cat in categories]
+
+    ax.bar(categories, correct_counts, label="Correct", color="green", alpha=0.7)
+    ax.bar(
+        categories,
+        incorrect_counts,
+        bottom=correct_counts,
+        label="Incorrect",
+        color="red",
+        alpha=0.7,
+    )
+
+    ax.set_xlabel("Cartography Category")
+    ax.set_ylabel("Number of Examples")
+    ax.set_title("Prediction Outcomes by Cartography Category")
+    ax.legend()
+    ax.grid(True, alpha=0.3, axis="y")
+
+    # Add value labels
+    for i, (c, ic) in enumerate(zip(correct_counts, incorrect_counts)):
+        ax.text(
+            i, c / 2, f"{c}", ha="center", va="center", color="white", fontweight="bold"
+        )
+        ax.text(
+            i,
+            c + ic / 2,
+            f"{ic}",
+            ha="center",
+            va="center",
+            color="white",
+            fontweight="bold",
+        )
+
+    plt.tight_layout()
+    fig_path = os.path.join(output_dir, "prediction_counts_by_category.png")
+    plt.savefig(fig_path, dpi=300, bbox_inches="tight")
+    print(f"   - Saved prediction counts by category to {fig_path}")
+    plt.close()
+
+    # Plot 3: Confidence distributions by correctness and category
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+
+    for i, category in enumerate(categories):
+        ax = axes[i]
+        cat_data = analysis_df[analysis_df["category"] == category]
+
+        correct_conf = cat_data[cat_data["is_correct"]]["confidence"]
+        incorrect_conf = cat_data[~cat_data["is_correct"]]["confidence"]
+
+        ax.hist(
+            correct_conf,
+            bins=30,
+            alpha=0.7,
+            label="Correct",
+            color="green",
+            density=True,
+        )
+        ax.hist(
+            incorrect_conf,
+            bins=30,
+            alpha=0.7,
+            label="Incorrect",
+            color="red",
+            density=True,
+        )
+
+        ax.set_xlabel("Confidence")
+        ax.set_ylabel("Density")
+        ax.set_title(f"Confidence Distribution - {category.capitalize()}")
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    fig_path = os.path.join(output_dir, "confidence_by_correctness_category.png")
+    plt.savefig(fig_path, dpi=300, bbox_inches="tight")
+    print(f"   - Saved confidence distributions to {fig_path}")
+    plt.close()
+
+    # Create CSV with representative samples
+    print("\n6. Creating representative samples CSV...")
+
+    samples = []
+    combinations = [
+        ("easy", True),
+        ("easy", False),
+        ("hard", True),
+        ("hard", False),
+        ("ambiguous", True),
+        ("ambiguous", False),
+    ]
+
+    for category, is_correct in combinations:
+        cat_correct_data = analysis_df[
+            (analysis_df["category"] == category)
+            & (analysis_df["is_correct"] == is_correct)
+        ]
+
+        # Sample up to 5 examples
+        n_samples = min(5, len(cat_correct_data))
+        if n_samples > 0:
+            sampled = cat_correct_data.sample(n=n_samples, random_state=42)
+
+            for _, row in sampled.iterrows():
+                sample = {
+                    "category": category,
+                    "is_correct": is_correct,
+                    "prediction_outcome": "correct" if is_correct else "incorrect",
+                    "id": row["id"],
+                    "question": row["question"],
+                    "context": row["context"][:200] + "..."
+                    if len(row["context"]) > 200
+                    else row["context"],
+                    "true_answers": "; ".join(row["answers"]["text"]),
+                    "predicted_answer": row["predicted_answer"],
+                    "confidence": round(row["confidence"], 4),
+                    "variability": round(row["variability"], 4),
+                    "correctness": round(row["correctness"], 4),
+                }
+                samples.append(sample)
+
+    samples_df = pd.DataFrame(samples)
+    samples_file = os.path.join(output_dir, "prediction_samples_by_category.csv")
+    samples_df.to_csv(samples_file, index=False)
+    print(f"   - Saved {len(samples_df)} representative samples to {samples_file}")
+
+    # Print summary statistics
+    print("\n" + "=" * 70)
+    print("SUMMARY STATISTICS")
+    print("=" * 70)
+    print(f"\nTotal predictions analyzed: {len(analysis_df)}")
+    print(f"Overall accuracy: {analysis_df['is_correct'].mean():.1f}%")
+
+    print("\nAccuracy by category:")
+    for category in categories:
+        cat_data = analysis_df[analysis_df["category"] == category]
+        acc = cat_data["is_correct"].mean()
+        count = len(cat_data)
+        print(f"  - {category.capitalize():10s}: {acc:.1f}% ({count} examples)")
+
+    print("\nCategory distribution:")
+    for category in categories:
+        count = (analysis_df["category"] == category).sum()
+        pct = 100 * count / len(analysis_df)
+        print(f"  - {category.capitalize():10s}: {count:4d} ({pct:5.1f}%)")
+
+    print("\n" + "=" * 70)
+    print("ANALYSIS COMPLETE")
+    print("=" * 70)
+    print(f"\nOutputs saved to: {output_dir}")
+    print(
+        f"- Prediction accuracy by category: {os.path.join(output_dir, 'prediction_accuracy_by_category.png')}"
+    )
+    print(
+        f"- Prediction counts by category: {os.path.join(output_dir, 'prediction_counts_by_category.png')}"
+    )
+    print(
+        f"- Confidence distributions: {os.path.join(output_dir, 'confidence_by_correctness_category.png')}"
+    )
+    print(f"- Representative samples: {samples_file}")
+    print("=" * 70 + "\n")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Unified dataset analysis (cartography and/or clustering)"
@@ -960,6 +1244,12 @@ def main():
         "--no_rules",
         action="store_true",
         help="Exclude rule-based error detection from unified export",
+    )
+    parser.add_argument(
+        "--eval_predictions",
+        type=str,
+        default=None,
+        help="Path to eval_predictions.jsonl file to analyze model predictions vs cartography regions",
     )
 
     args = parser.parse_args()
@@ -1036,6 +1326,14 @@ def main():
             cluster_dir=args.cluster_dir,
             dataset_name=args.dataset,
             split=split,
+            output_dir=args.output_dir,
+        )
+
+    # 5. Model predictions analysis (if eval_predictions provided)
+    if args.eval_predictions and has_cartography:
+        analyze_model_predictions(
+            eval_predictions_path=args.eval_predictions,
+            cartography_dir=args.cartography_dir,
             output_dir=args.output_dir,
         )
 

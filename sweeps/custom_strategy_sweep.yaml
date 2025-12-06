@@ -46,41 +46,47 @@ parameters:
   filter_validation:
     value: true
 
-  # #### Filteration Techniques
-  # # Rule Based
-  # filter_rule_based:
-  #   values: [true, false]
+  ### Filteration Techniques
+  # Rule Based
+  filter_rule_based:
+    values: [true, false]
 
-  # rule_similarity_threshold:
-  #   distribution: uniform
-  #   min: 0.05
-  #   max: 0.50
+  rule_sim_threshold:
+    distribution: uniform
+    min: 0.05
+    max: 0.15
 
-  # # Cluster Based
-  # filter_clusters:
-  #   values: [true, false]
+  # Cluster Based
+  filter_clusters:
+    values: [true, false]
 
-  # exclude_noise_cluster:
-  #   values: [true, false]
+  exclude_noise_cluster:
+    values: [true, false]
 
-  # min_cluster_probability:
-  #   distribution: uniform
-  #   min: 0.2
-  #   max: 0.9
+  min_cluster_probability:
+    distribution: uniform
+    min: 0.65
+    max: 0.90
 
   # Cartography Based
   filter_ambiguous:
-    value: true
+    values: [true, false]
 
   train_variability_margin:
     distribution: uniform
-    min: -0.25
-    max: 0.25
+    min: 0.13
+    max: 0.24
 
   ambiguous_top_fraction:
     distribution: uniform
-    min: 0.25
-    max: 0.50
+    min: 0.30
+    max: 0.40
+  ### Label Smoothing and Soft Weighting
+  use_label_smoothing:
+    values: [true, false]
+  
+  use_soft_weighting:
+    values: [true, false]
 
 # Drop percentage threshold - terminate early if too much data is dropped
 max_drop_percentage:
