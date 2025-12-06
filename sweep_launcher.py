@@ -35,6 +35,7 @@ SWEEP_CONFIGS = {
     "filtering": "sweeps/filtering_strategies_sweep.yaml",
     "smoothing": "sweeps/smoothing_weighting_sweep.yaml",
     "combined": "sweeps/combined_strategies_sweep.yaml",
+    "custom": "sweeps/custom_strategy_sweep.yaml",
 }
 
 PROJECT_NAME = "qa-cartography-experiments"
@@ -217,7 +218,7 @@ Examples:
     parser.add_argument(
         "--sweep",
         choices=list(SWEEP_CONFIGS.keys()),
-        help="Type of sweep to launch (baseline, filtering, smoothing, combined)",
+        help="Type of sweep to launch (baseline, filtering, smoothing, combined, custom)",
     )
 
     parser.add_argument(

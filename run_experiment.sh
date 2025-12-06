@@ -18,7 +18,21 @@ echo "Output directory: ${OUTPUT_DIR}"
 echo "W&B Project: ${WANDB_PROJECT}"
 echo ""
 
-# Run training
+
+# Detect train/val variability margin from args or config (if present)
+TRAIN_VAR_MARGIN=""
+VAL_VAR_MARGIN=""
+for arg in "$@"; do
+  case $arg in
+    --train_variability_margin=*)
+      TRAIN_VAR_MARGIN="$arg"
+      ;;
+    --val_variability_margin=*)
+      VAL_VAR_MARGIN="$arg"
+      ;;
+  esac
+done
+
 python3 run.py \
   --output_dir "${OUTPUT_DIR}" \
   --wandb_project "${WANDB_PROJECT}" \
@@ -35,6 +49,8 @@ python3 run.py \
   --save_total_limit 2 \
   --load_best_model_at_end \
   --metric_for_best_model f1 \
+  ${TRAIN_VAR_MARGIN} \
+  ${VAL_VAR_MARGIN} \
   "$@"
 
 echo ""

@@ -59,7 +59,8 @@ def extract_run_metrics(run: wandb.apis.public.Run) -> Dict:
         # Filtering strategies
         "filter_ambiguous": config.get("filter_ambiguous", False),
         "ambiguous_top_fraction": config.get("ambiguous_top_fraction", "N/A"),
-        "variability_margin": config.get("variability_margin", "N/A"),
+        "train_variability_margin": config.get("train_variability_margin", "N/A"),
+        "val_variability_margin": config.get("val_variability_margin", "N/A"),
         "filter_clusters": config.get("filter_clusters", False),
         "exclude_noise_cluster": config.get("exclude_noise_cluster", False),
         "min_cluster_probability": config.get("min_cluster_probability", "N/A"),

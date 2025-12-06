@@ -81,13 +81,15 @@ class AmbiguousQuestionFilter(DatasetFilter):
             dataset: Dataset to filter
             metrics_path: Path to cartography output directory or CSV file
             top_fraction: Fraction of most ambiguous examples to keep (default: 0.33 = top 33%)
-            variability_margin: Margin to adjust variability threshold (default: 0.0)
+            variability_margin: Margin to adjust variability threshold (default: 0.0). Should be set to train_variability_margin or val_variability_margin depending on split.
             apply_rule_based_filter: If True, also filter non-questions from top ambiguous examples
+        Note:
+            Pass the correct margin for the split (train or validation) via config as train_variability_margin or val_variability_margin.
         """
         super().__init__(dataset)
         self.metrics_path = metrics_path
         self.top_fraction = top_fraction
-        self.variability_margin = variability_margin
+        self.variability_margin = variability_margin  # Should be set per split (train/val)
         self.apply_rule_based_filter = apply_rule_based_filter
         self.stats = {
             "removed_ambiguous_not_top": 0,
@@ -641,11 +643,12 @@ def apply_filters(
         print("\n" + "=" * 70)
         print("Applying Ambiguous Question Filter")
         print("=" * 70)
+        # Pass the correct margin for the split (train/val) as variability_margin
         filter_obj = AmbiguousQuestionFilter(
             dataset=filtered_dataset,
             metrics_path=config["metrics_path"],
             top_fraction=config.get("top_fraction", 0.33),
-            variability_margin=config.get("variability_margin", 0.0),
+            variability_margin=config.get("variability_margin", 0.0),  # Should be set to train_variability_margin or val_variability_margin in config
             apply_rule_based_filter=config.get("apply_rule_based_filter", False),
         )
         filtered_dataset = filter_obj.apply()
