@@ -61,10 +61,10 @@ parameters:
     min: 0.25
     max: 0.70
 
-  variability_margin:
+  train_variability_margin:
     distribution: uniform
-    min: -0.05
-    max: 0.05
+    min: -0.25
+    max: 0.25
 
   filter_clusters:
     values: [true, false]

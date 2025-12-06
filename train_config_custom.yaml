@@ -20,7 +20,8 @@ cartography_output_dir: "./cartography_output"
 # Filtering Strategies
 filter_ambiguous: true
 ambiguous_top_fraction: 0.33
-variability_margin: 0.0
+train_variability_margin: 0.0
+val_variability_margin: 0.0
 
 filter_clusters: true
 cluster_assignments_path: "./cluster_output"

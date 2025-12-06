@@ -129,10 +129,16 @@ def main():
         help="Fraction of most ambiguous examples to keep when using ambiguous filtering (default: 0.33 = top 33%%).",
     )
     argp.add_argument(
-        "--variability_margin",
+        "--train_variability_margin",
         type=float,
         default=0.0,
-        help="Margin to shift variability threshold for ambiguous classification (default: 0.0). Positive values make classification more strict (fewer ambiguous examples), negative values make it more lenient (more ambiguous examples).",
+        help="Margin to shift variability threshold for ambiguous classification on TRAIN set (default: 0.0). Positive values make classification more strict (fewer ambiguous examples), negative values make it more lenient (more ambiguous examples).",
+    )
+    argp.add_argument(
+        "--val_variability_margin",
+        type=float,
+        default=0.0,
+        help="Margin to shift variability threshold for ambiguous classification on VALIDATION set (default: 0.0). Positive values make classification more strict (fewer ambiguous examples), negative values make it more lenient (more ambiguous examples).",
     )
     argp.add_argument(
         "--filter_clusters",
@@ -342,7 +348,8 @@ def main():
                 # Filtering strategies
                 "filter_ambiguous": args.filter_ambiguous,
                 "ambiguous_top_fraction": args.ambiguous_top_fraction,
-                "variability_margin": args.variability_margin,
+                "train_variability_margin": args.train_variability_margin,
+                "val_variability_margin": args.val_variability_margin,
                 "filter_clusters": args.filter_clusters,
                 "filter_rule_based": args.filter_rule_based,
                 "exclude_noise_cluster": args.exclude_noise_cluster,
@@ -444,7 +451,7 @@ def main():
                     "enabled": True,
                     "metrics_path": args.cartography_output_dir,
                     "top_fraction": args.ambiguous_top_fraction,
-                    "variability_margin": args.variability_margin,
+                    "variability_margin": args.train_variability_margin,
                     "apply_rule_based_filter": False,
                 }
             }
@@ -629,7 +636,7 @@ def main():
                         "enabled": True,
                         "metrics_path": val_cartography_dir,
                         "top_fraction": args.ambiguous_top_fraction,
-                        "variability_margin": args.variability_margin,
+                        "variability_margin": args.val_variability_margin,
                         "apply_rule_based_filter": False,
                     }
                 }
@@ -643,7 +650,7 @@ def main():
                 print(f"  Ambiguous filtering: removed {removed_count} examples")
                 print(f"    Cartography metrics from: {val_cartography_dir}")
                 print(f"    Top fraction: {args.ambiguous_top_fraction}")
-                print(f"    Variability margin: {args.variability_margin}")
+                print(f"    Variability margin: {args.val_variability_margin}")
 
             # Apply rule-based filtering if enabled
             if args.filter_rule_based:

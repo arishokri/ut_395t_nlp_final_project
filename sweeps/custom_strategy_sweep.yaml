@@ -5,7 +5,7 @@
 program: run.py
 method: bayes # Intelligent search that learns from results
 project: qa-cartography-experiments
-name: filtering-strategies
+name: custom-strategy
 
 # Metric to optimize
 # Using F1 instead of exact_match because:
@@ -36,54 +36,58 @@ parameters:
   num_train_epochs:
     value: 3
   per_device_train_batch_size:
-    value: 64
+    value: 96
 
   # Cartography and filtering
   enable_cartography:
     value: false
 
   # Apply filtering to validation set (only applies when filter_ambiguous=true)
-  # Note: Validation is NOT filtered in cluster filtering mode to avoid cluster mismatch
   filter_validation:
     value: true
 
-  # Search over filtering strategies
+  # #### Filteration Techniques
+  # # Rule Based
+  # filter_rule_based:
+  #   values: [true, false]
+
+  # rule_similarity_threshold:
+  #   distribution: uniform
+  #   min: 0.05
+  #   max: 0.50
+
+  # # Cluster Based
+  # filter_clusters:
+  #   values: [true, false]
+
+  # exclude_noise_cluster:
+  #   values: [true, false]
+
+  # min_cluster_probability:
+  #   distribution: uniform
+  #   min: 0.2
+  #   max: 0.9
+
+  # Cartography Based
   filter_ambiguous:
-    values: [true, false]
+    value: true
 
-  # Rule-based filters
-  filter_rule_based:
-    values: [true, false]
-
-  # Top fraction for ambiguous filtering (only relevant when filter_ambiguous=true)
-  ambiguous_top_fraction:
-    distribution: uniform
-    min: 0.25
-    max: 0.70
-
-  # Variability margins for ambiguous classification (only relevant when filter_ambiguous=true)
   train_variability_margin:
     distribution: uniform
     min: -0.25
     max: 0.25
 
-  val_variability_margin:
+  ambiguous_top_fraction:
     distribution: uniform
-    min: -0.05
-    max: 0.05
+    min: 0.25
+    max: 0.50
 
-  filter_clusters:
-    values: [true, false]
+# Drop percentage threshold - terminate early if too much data is dropped
+max_drop_percentage:
+  value: 60 # Fail if more than 30% of data is dropped (filtered out)
 
-  # Cluster exclusion parameters (only relevant when filter_clusters=true)
-  exclude_noise_cluster:
-    values: [true, false]
-
-  min_cluster_probability:
-    distribution: uniform
-    min: 0.5
-    max: 0.9
-
-  # Drop percentage threshold - terminate early if too much data is dropped
-  max_drop_percentage:
-    value: 30 # Fail if more than 30% of data is dropped (filtered out)
+early_terminate:
+  type: hyperband
+  min_iter: 1
+  eta: 3
+  # s: 2

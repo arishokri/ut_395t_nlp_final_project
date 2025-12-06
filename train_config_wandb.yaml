@@ -1,577 +1,580 @@
 _name_or_path:
-    value: google/electra-small-discriminator
+  value: google/electra-small-discriminator
 _wandb:
-    value:
-        cli_version: 0.23.1
-        e:
-            8uy0vvu0qibopxcy0y5ma08cx4q2zeee:
-                args:
-                    - --ambiguous_top_fraction=0.3890298292161149
-                    - --dataset=Eladio/emrqa-msquad
-                    - --enable_cartography=False
-                    - --exclude_noise_cluster=False
-                    - --filter_ambiguous=False
-                    - --filter_clusters=True
-                    - --filter_rule_based=True
-                    - --filter_validation=True
-                    - --max_eval_samples=2000
-                    - --max_length=512
-                    - --max_train_samples=5000
-                    - --min_cluster_probability=0.760406887845126
-                    - --model=google/electra-small-discriminator
-                    - --num_train_epochs=3
-                    - --per_device_train_batch_size=64
-                    - --smoothing_factor=0.5279782269132461
-                    - --use_label_smoothing=False
-                    - --use_soft_weighting=False
-                    - --variability_margin=0.011290383839404408
-                    - --weight_clip_max=5.09336763402875
-                    - --weight_clip_min=0.1536845100564468
-                codePath: run.py
-                codePathLocal: run.py
-                cpu_count: 16
-                cpu_count_logical: 24
-                cudaVersion: "13.0"
-                disk:
-                    /:
-                        total: "973837025280"
-                        used: "401260982272"
-                email: arashsh0@live.com
-                executable: /home/ari/repos/ut_395t_nlp_final_project/.venv/bin/python
-                git:
-                    commit: c309556be62b5926a9f7b1c10c80e615d4e21871
-                    remote: git@github.com:arishokri/ut_395t_nlp_final_project.git
-                gpu: NVIDIA GeForce RTX 3090 Ti
-                gpu_count: 1
-                gpu_nvidia:
-                    - architecture: Ampere
-                      cudaCores: 10752
-                      memoryTotal: "25757220864"
-                      name: NVIDIA GeForce RTX 3090 Ti
-                      uuid: GPU-77073b86-4c0b-1692-f741-10920120f98d
-                host: pop-os
-                memory:
-                    total: "67123408896"
-                os: Linux-6.17.4-76061704-generic-x86_64-with-glibc2.35
-                program: /home/ari/repos/ut_395t_nlp_final_project/run.py
-                python: CPython 3.13.3
-                root: /home/ari/repos/ut_395t_nlp_final_project
-                startedAt: "2025-12-05T18:38:01.706002Z"
-                writerId: 8uy0vvu0qibopxcy0y5ma08cx4q2zeee
-        m:
-            - "1": train/global_step
-              "6":
-                - 3
-              "7": []
-            - "2": '*'
-              "5": 1
-              "6":
-                - 1
-              "7": []
-        python_version: 3.13.3
-        t:
-            "1":
-                - 1
-                - 5
-                - 11
-                - 49
-                - 51
-                - 53
-                - 71
-                - 100
-            "2":
-                - 1
-                - 5
-                - 11
-                - 49
-                - 51
-                - 53
-                - 71
-                - 100
-            "3":
-                - 2
-                - 7
-                - 13
-                - 14
-                - 15
-                - 16
-                - 19
-                - 62
-                - 66
-            "4": 3.13.3
-            "5": 0.23.1
-            "6": 4.57.3
-            "9":
-                "1": transformers_trainer
-            "12": 0.23.1
-            "13": linux-x86_64
+  value:
+    cli_version: 0.23.1
+    e:
+      8uy0vvu0qibopxcy0y5ma08cx4q2zeee:
+        args:
+          - --ambiguous_top_fraction=0.3890298292161149
+          - --dataset=Eladio/emrqa-msquad
+          - --enable_cartography=False
+          - --exclude_noise_cluster=False
+          - --filter_ambiguous=False
+          - --filter_clusters=True
+          - --filter_rule_based=True
+          - --filter_validation=True
+          - --max_eval_samples=2000
+          - --max_length=512
+          - --max_train_samples=5000
+          - --min_cluster_probability=0.760406887845126
+          - --model=google/electra-small-discriminator
+          - --num_train_epochs=3
+          - --per_device_train_batch_size=64
+          - --smoothing_factor=0.5279782269132461
+          - --use_label_smoothing=False
+          - --use_soft_weighting=False
+          - --train_variability_margin=0.011290383839404408
+          - --val_variability_margin=0.011290383839404408
+          - --weight_clip_max=5.09336763402875
+          - --weight_clip_min=0.1536845100564468
+        codePath: run.py
+        codePathLocal: run.py
+        cpu_count: 16
+        cpu_count_logical: 24
+        cudaVersion: "13.0"
+        disk:
+          /:
+            total: "973837025280"
+            used: "401260982272"
+        email: arashsh0@live.com
+        executable: /home/ari/repos/ut_395t_nlp_final_project/.venv/bin/python
+        git:
+          commit: c309556be62b5926a9f7b1c10c80e615d4e21871
+          remote: git@github.com:arishokri/ut_395t_nlp_final_project.git
+        gpu: NVIDIA GeForce RTX 3090 Ti
+        gpu_count: 1
+        gpu_nvidia:
+          - architecture: Ampere
+            cudaCores: 10752
+            memoryTotal: "25757220864"
+            name: NVIDIA GeForce RTX 3090 Ti
+            uuid: GPU-77073b86-4c0b-1692-f741-10920120f98d
+        host: pop-os
+        memory:
+          total: "67123408896"
+        os: Linux-6.17.4-76061704-generic-x86_64-with-glibc2.35
+        program: /home/ari/repos/ut_395t_nlp_final_project/run.py
+        python: CPython 3.13.3
+        root: /home/ari/repos/ut_395t_nlp_final_project
+        startedAt: "2025-12-05T18:38:01.706002Z"
+        writerId: 8uy0vvu0qibopxcy0y5ma08cx4q2zeee
+    m:
+      - "1": train/global_step
+        "6":
+          - 3
+        "7": []
+      - "2": "*"
+        "5": 1
+        "6":
+          - 1
+        "7": []
+    python_version: 3.13.3
+    t:
+      "1":
+        - 1
+        - 5
+        - 11
+        - 49
+        - 51
+        - 53
+        - 71
+        - 100
+      "2":
+        - 1
+        - 5
+        - 11
+        - 49
+        - 51
+        - 53
+        - 71
+        - 100
+      "3":
+        - 2
+        - 7
+        - 13
+        - 14
+        - 15
+        - 16
+        - 19
+        - 62
+        - 66
+      "4": 3.13.3
+      "5": 0.23.1
+      "6": 4.57.3
+      "9":
+        "1": transformers_trainer
+      "12": 0.23.1
+      "13": linux-x86_64
 ablations:
-    value: none
+  value: none
 accelerator_config:
-    value:
-        dispatch_batches: null
-        even_batches: true
-        gradient_accumulation_kwargs: null
-        non_blocking: false
-        split_batches: false
-        use_seedable_sampler: true
+  value:
+    dispatch_batches: null
+    even_batches: true
+    gradient_accumulation_kwargs: null
+    non_blocking: false
+    split_batches: false
+    use_seedable_sampler: true
 adafactor:
-    value: false
+  value: false
 adam_beta1:
-    value: 0.9
+  value: 0.9
 adam_beta2:
-    value: 0.999
+  value: 0.999
 adam_epsilon:
-    value: 1e-08
+  value: 1e-08
 add_cross_attention:
-    value: false
+  value: false
 ambiguous_top_fraction:
-    value: 0.3890298292161149
+  value: 0.3890298292161149
 architectures:
-    value:
-        - ElectraForPreTraining
+  value:
+    - ElectraForPreTraining
 attention_probs_dropout_prob:
-    value: 0.1
+  value: 0.1
 auto_find_batch_size:
-    value: false
+  value: false
 average_tokens_across_devices:
-    value: true
+  value: true
 bad_words_ids:
-    value: null
+  value: null
 batch_eval_metrics:
-    value: false
+  value: false
 begin_suppress_tokens:
-    value: null
+  value: null
 bf16:
-    value: false
+  value: false
 bf16_full_eval:
-    value: false
+  value: false
 bos_token_id:
-    value: null
+  value: null
 chunk_size_feed_forward:
-    value: 0
+  value: 0
 classifier_dropout:
-    value: null
+  value: null
 cross_attention_hidden_size:
-    value: null
+  value: null
 data_seed:
-    value: null
+  value: null
 dataloader_drop_last:
-    value: false
+  value: false
 dataloader_num_workers:
-    value: 0
+  value: 0
 dataloader_persistent_workers:
-    value: false
+  value: false
 dataloader_pin_memory:
-    value: true
+  value: true
 dataloader_prefetch_factor:
-    value: null
+  value: null
 dataset:
-    value: Eladio/emrqa-msquad
+  value: Eladio/emrqa-msquad
 ddp_backend:
-    value: null
+  value: null
 ddp_broadcast_buffers:
-    value: null
+  value: null
 ddp_bucket_cap_mb:
-    value: null
+  value: null
 ddp_find_unused_parameters:
-    value: null
+  value: null
 ddp_timeout:
-    value: 1800
+  value: 1800
 debug:
-    value: []
+  value: []
 decoder_start_token_id:
-    value: null
+  value: null
 deepspeed:
-    value: null
+  value: null
 disable_tqdm:
-    value: false
+  value: false
 diversity_penalty:
-    value: 0
+  value: 0
 do_eval:
-    value: true
+  value: true
 do_predict:
-    value: false
+  value: false
 do_sample:
-    value: false
+  value: false
 do_train:
-    value: true
+  value: true
 dtype:
-    value: float32
+  value: float32
 early_stopping:
-    value: false
+  value: false
 embedding_size:
-    value: 128
+  value: 128
 enable_cartography:
-    value: false
+  value: false
 encoder_no_repeat_ngram_size:
-    value: 0
+  value: 0
 eos_token_id:
-    value: null
+  value: null
 eval_accumulation_steps:
-    value: null
+  value: null
 eval_delay:
-    value: 0
+  value: 0
 eval_do_concat_batches:
-    value: true
+  value: true
 eval_on_start:
-    value: false
+  value: false
 eval_steps:
-    value: null
+  value: null
 eval_strategy:
-    value: epoch
+  value: epoch
 eval_use_gather_object:
-    value: false
+  value: false
 exclude_noise_cluster:
-    value: false
+  value: false
 exponential_decay_length_penalty:
-    value: null
+  value: null
 filter_ambiguous:
-    value: false
+  value: false
 filter_clusters:
-    value: true
+  value: true
 filter_rule_based:
-    value: true
+  value: true
 filter_validation:
-    value: true
+  value: true
 finetuning_task:
-    value: null
+  value: null
 forced_bos_token_id:
-    value: null
+  value: null
 forced_eos_token_id:
-    value: null
+  value: null
 fp16:
-    value: false
+  value: false
 fp16_backend:
-    value: auto
+  value: auto
 fp16_full_eval:
-    value: false
+  value: false
 fp16_opt_level:
-    value: O1
+  value: O1
 fsdp:
-    value: []
+  value: []
 fsdp_config:
-    value:
-        min_num_params: 0
-        xla: false
-        xla_fsdp_grad_ckpt: false
-        xla_fsdp_v2: false
+  value:
+    min_num_params: 0
+    xla: false
+    xla_fsdp_grad_ckpt: false
+    xla_fsdp_v2: false
 fsdp_min_num_params:
-    value: 0
+  value: 0
 fsdp_transformer_layer_cls_to_wrap:
-    value: null
+  value: null
 full_determinism:
-    value: false
+  value: false
 gradient_accumulation_steps:
-    value: 1
+  value: 1
 gradient_checkpointing:
-    value: false
+  value: false
 gradient_checkpointing_kwargs:
-    value: null
+  value: null
 greater_is_better:
-    value: null
+  value: null
 group_by_length:
-    value: false
+  value: false
 half_precision_backend:
-    value: auto
+  value: auto
 hidden_act:
-    value: gelu
+  value: gelu
 hidden_dropout_prob:
-    value: 0.1
+  value: 0.1
 hidden_size:
-    value: 256
+  value: 256
 hub_always_push:
-    value: false
+  value: false
 hub_model_id:
-    value: null
+  value: null
 hub_private_repo:
-    value: null
+  value: null
 hub_revision:
-    value: null
+  value: null
 hub_strategy:
-    value: every_save
+  value: every_save
 hub_token:
-    value: <HUB_TOKEN>
+  value: <HUB_TOKEN>
 id2label:
-    value:
-        "0": LABEL_0
-        "1": LABEL_1
+  value:
+    "0": LABEL_0
+    "1": LABEL_1
 ignore_data_skip:
-    value: false
+  value: false
 include_for_metrics:
-    value: []
+  value: []
 include_inputs_for_metrics:
-    value: false
+  value: false
 include_num_input_tokens_seen:
-    value: "no"
+  value: "no"
 include_tokens_per_second:
-    value: false
+  value: false
 initializer_range:
-    value: 0.02
+  value: 0.02
 intermediate_size:
-    value: 1024
+  value: 1024
 is_decoder:
-    value: false
+  value: false
 is_encoder_decoder:
-    value: false
+  value: false
 jit_mode_eval:
-    value: false
+  value: false
 label_names:
-    value: null
+  value: null
 label_smoothing_factor:
-    value: 0
+  value: 0
 label2id:
-    value:
-        LABEL_0: 0
-        LABEL_1: 1
+  value:
+    LABEL_0: 0
+    LABEL_1: 1
 layer_norm_eps:
-    value: 1e-12
+  value: 1e-12
 learning_rate:
-    value: 5e-05
+  value: 5e-05
 length_column_name:
-    value: length
+  value: length
 length_penalty:
-    value: 1
+  value: 1
 liger_kernel_config:
-    value: null
+  value: null
 load_best_model_at_end:
-    value: true
+  value: true
 local_rank:
-    value: 0
+  value: 0
 log_level:
-    value: passive
+  value: passive
 log_level_replica:
-    value: warning
+  value: warning
 log_on_each_node:
-    value: true
+  value: true
 logging_dir:
-    value: trainer_output/runs/Dec05_12-38-00_pop-os
+  value: trainer_output/runs/Dec05_12-38-00_pop-os
 logging_first_step:
-    value: false
+  value: false
 logging_nan_inf_filter:
-    value: true
+  value: true
 logging_steps:
-    value: 500
+  value: 500
 logging_strategy:
-    value: steps
+  value: steps
 lr_scheduler_type:
-    value: linear
+  value: linear
 max_eval_samples:
-    value: 2000
+  value: 2000
 max_grad_norm:
-    value: 1
+  value: 1
 max_length:
-    value: 512
+  value: 512
 max_position_embeddings:
-    value: 512
+  value: 512
 max_steps:
-    value: -1
+  value: -1
 max_train_samples:
-    value: 5000
+  value: 5000
 metric_for_best_model:
-    value: f1
+  value: f1
 min_cluster_probability:
-    value: 0.760406887845126
+  value: 0.760406887845126
 min_length:
-    value: 0
+  value: 0
 model:
-    value: google/electra-small-discriminator
+  value: google/electra-small-discriminator
 model/num_parameters:
-    value: 13483522
+  value: 13483522
 model_type:
-    value: electra
+  value: electra
 mp_parameters:
-    value: ""
+  value: ""
 neftune_noise_alpha:
-    value: null
+  value: null
 no_cuda:
-    value: false
+  value: false
 no_repeat_ngram_size:
-    value: 0
+  value: 0
 num_attention_heads:
-    value: 4
+  value: 4
 num_beam_groups:
-    value: 1
+  value: 1
 num_beams:
-    value: 1
+  value: 1
 num_hidden_layers:
-    value: 12
+  value: 12
 num_return_sequences:
-    value: 1
+  value: 1
 num_train_epochs:
-    value: 3
+  value: 3
 optim:
-    value: adamw_torch_fused
+  value: adamw_torch_fused
 optim_args:
-    value: null
+  value: null
 optim_target_modules:
-    value: null
+  value: null
 output_attentions:
-    value: false
+  value: false
 output_dir:
-    value: trainer_output
+  value: trainer_output
 output_hidden_states:
-    value: false
+  value: false
 output_scores:
-    value: false
+  value: false
 overwrite_output_dir:
-    value: false
+  value: false
 pad_token_id:
-    value: 0
+  value: 0
 parallelism_config:
-    value: null
+  value: null
 past_index:
-    value: -1
+  value: -1
 per_device_eval_batch_size:
-    value: 8
+  value: 8
 per_device_train_batch_size:
-    value: 64
+  value: 64
 per_gpu_eval_batch_size:
-    value: null
+  value: null
 per_gpu_train_batch_size:
-    value: null
+  value: null
 position_embedding_type:
-    value: absolute
+  value: absolute
 prediction_loss_only:
-    value: false
+  value: false
 prefix:
-    value: null
+  value: null
 problem_type:
-    value: null
+  value: null
 project:
-    value: huggingface
+  value: huggingface
 push_to_hub:
-    value: false
+  value: false
 push_to_hub_model_id:
-    value: null
+  value: null
 push_to_hub_organization:
-    value: null
+  value: null
 push_to_hub_token:
-    value: <PUSH_TO_HUB_TOKEN>
+  value: <PUSH_TO_HUB_TOKEN>
 ray_scope:
-    value: last
+  value: last
 remove_invalid_values:
-    value: false
+  value: false
 remove_unused_columns:
-    value: true
+  value: true
 repetition_penalty:
-    value: 1
+  value: 1
 report_to:
-    value:
-        - wandb
+  value:
+    - wandb
 restore_callback_states_from_checkpoint:
-    value: false
+  value: false
 resume_from_checkpoint:
-    value: null
+  value: null
 return_dict:
-    value: true
+  value: true
 return_dict_in_generate:
-    value: false
+  value: false
 rule_name:
-    value: low_answer_question_overlap
+  value: low_answer_question_overlap
 rule_sim_threshold:
-    value: 0.05
+  value: 0.05
 run_name:
-    value: null
+  value: null
 save_on_each_node:
-    value: false
+  value: false
 save_only_model:
-    value: false
+  value: false
 save_safetensors:
-    value: true
+  value: true
 save_steps:
-    value: 500
+  value: 500
 save_strategy:
-    value: steps
+  value: steps
 save_total_limit:
-    value: 2
+  value: 2
 seed:
-    value: 42
+  value: 42
 sep_token_id:
-    value: null
+  value: null
 skip_memory_metrics:
-    value: true
+  value: true
 smoothing_factor:
-    value: 0.5279782269132461
+  value: 0.5279782269132461
 summary_activation:
-    value: gelu
+  value: gelu
 summary_last_dropout:
-    value: 0.1
+  value: 0.1
 summary_type:
-    value: first
+  value: first
 summary_use_proj:
-    value: true
+  value: true
 suppress_tokens:
-    value: null
+  value: null
 task_specific_params:
-    value: null
+  value: null
 temperature:
-    value: 1
+  value: 1
 tf_legacy_loss:
-    value: false
+  value: false
 tf32:
-    value: null
+  value: null
 tie_encoder_decoder:
-    value: false
+  value: false
 tie_word_embeddings:
-    value: true
+  value: true
 tokenizer_class:
-    value: null
+  value: null
 top_k:
-    value: 50
+  value: 50
 top_p:
-    value: 1
+  value: 1
 torch_compile:
-    value: false
+  value: false
 torch_compile_backend:
-    value: null
+  value: null
 torch_compile_mode:
-    value: null
+  value: null
 torch_empty_cache_steps:
-    value: null
+  value: null
 torchdynamo:
-    value: null
+  value: null
 torchscript:
-    value: false
+  value: false
 tpu_metrics_debug:
-    value: false
+  value: false
 tpu_num_cores:
-    value: null
+  value: null
 trackio_space_id:
-    value: trackio
+  value: trackio
 transformers_version:
-    value: 4.57.3
+  value: 4.57.3
 type_vocab_size:
-    value: 2
+  value: 2
 typical_p:
-    value: 1
+  value: 1
 use_bfloat16:
-    value: false
+  value: false
 use_cache:
-    value: true
+  value: true
 use_cpu:
-    value: false
+  value: false
 use_label_smoothing:
-    value: false
+  value: false
 use_legacy_prediction_loop:
-    value: false
+  value: false
 use_liger_kernel:
-    value: false
+  value: false
 use_mps_device:
-    value: false
+  value: false
 use_soft_weighting:
-    value: false
-variability_margin:
-    value: 0.011290383839404408
+  value: false
+train_variability_margin:
+  value: 0.011290383839404408
+val_variability_margin:
+  value: 0.011290383839404408
 vocab_size:
-    value: 30522
+  value: 30522
 warmup_ratio:
-    value: 0
+  value: 0
 warmup_steps:
-    value: 0
+  value: 0
 weight_clip_max:
-    value: 5.09336763402875
+  value: 5.09336763402875
 weight_clip_min:
-    value: 0.1536845100564468
+  value: 0.1536845100564468
 weight_decay:
-    value: 0
+  value: 0

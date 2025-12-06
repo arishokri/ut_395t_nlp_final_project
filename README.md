@@ -434,6 +434,7 @@ python analyze_dataset.py \
 ### HDBSCAN Parameters
 
 **`--min_cluster_size`**: Minimum number of points required to form a cluster.
+
 - **Effect**: Larger values → fewer, larger clusters; smaller values → more, granular clusters
 - **Recommended range**: 0.3-0.5% of dataset size
   - For ~10K examples: 30-50
@@ -441,6 +442,7 @@ python analyze_dataset.py \
   - For ~130K examples: 400-650
 
 **`--min_samples`**: Controls clustering strictness and density requirements.
+
 - **Effect**: Larger values → stricter, more noise points; smaller values → more lenient clustering
 - **Recommended range**: Set equal to `min_cluster_size` for balanced results, or 50-70% of `min_cluster_size` for more clusters
   - Balanced: `--min_samples = --min_cluster_size`
@@ -479,7 +481,8 @@ python run.py \
   --filter_ambiguous \
   --cartography_output_dir ./cartography_output \
   --ambiguous_top_fraction 0.33 \
-  --variability_margin 0.0 \
+  --train_variability_margin 0.0 \
+  --val_variability_margin 0.0 \
   --output_dir ./filtered_model
 ```
 
@@ -491,10 +494,14 @@ python run.py \
   - 0.33 = keep top 33% of ambiguous examples
   - Lower values = more aggressive filtering (fewer ambiguous kept)
   - Higher values = more lenient filtering (more ambiguous kept)
-- `--variability_margin`: Margin to adjust variability threshold for ambiguous classification (default: 0.0)
+    -- `--train_variability_margin`: Margin to adjust variability threshold for ambiguous classification on TRAIN set (default: 0.0)
   - Positive values (e.g., 0.05) = stricter classification, fewer examples marked as ambiguous
   - Negative values (e.g., -0.05) = more lenient classification, more examples marked as ambiguous
-  - The threshold is: `median(variability) + variability_margin`
+  - The threshold is: `median(variability) + train_variability_margin`
+    -- `--val_variability_margin`: Margin to adjust variability threshold for ambiguous classification on VALIDATION set (default: 0.0)
+  - Positive values (e.g., 0.05) = stricter classification, fewer examples marked as ambiguous
+  - Negative values (e.g., -0.05) = more lenient classification, more examples marked as ambiguous
+  - The threshold is: `median(variability) + val_variability_margin`
 
 ### Cluster-Based Filtering
 
@@ -539,7 +546,8 @@ python run.py \
   --do_train \
   --filter_ambiguous \
   --ambiguous_top_fraction 0.5 \
-  --variability_margin 0.05 \
+  --train_variability_margin 0.05 \
+  --val_variability_margin 0.05 \
   --filter_clusters \
   --exclude_noise_cluster \
   --min_cluster_probability 0.7 \
